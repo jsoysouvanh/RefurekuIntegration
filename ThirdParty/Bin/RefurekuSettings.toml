@@ -1,0 +1,59 @@
+[FileGenerationSettings]
+# Generated files will use this extension
+generatedFilesExtension = ".rfk.h"
+
+# List of supported extensions
+supportedExtensions		= [".h", ".hpp"]
+
+entityMacrosFilename	= "EntityMacros.h"
+
+# Generated files will be located here
+# The working directory is /LibraryIntegration (or /GeneratorIntegration),
+# so the outputDirectory will be /LibraryIntegration/Include/Generated (or /GeneratorIntegration/Include/Generated)
+outputDirectory			= '''Include/Generated'''
+
+# Files contained in the directories of this list will be parsed
+toParseDirectories		= [
+	'''Include'''	# Include is relative to /LibraryIntegration, so it becomes /LibraryIntegration/Include/
+]
+
+# Files to parse which are not included in any directory of toParseDirectories
+toParseFiles			= []
+
+# Files contained in the directories of this list will be ignored
+ignoredDirectories		= [
+	'''Include/Generated''',	# Include/Generated is relative to /LibraryIntegration/, so it becomes /LibraryIntegration/Include/Generated/
+]
+
+# Files not to parse which are not included in any directory of ignoredDirectories
+ignoredFiles			= []
+
+
+[FileParsingSettings]
+# Abort parsing on first encountered error
+shouldAbortParsingOnFirstError	= true
+
+shouldParseAllEntities			= false
+
+# Include directories of the project
+projectIncludeDirectories		= [
+	'''../ThirdParty/Include''',	# ../ThirdParty/Include is relative to /LibraryIntegration, so it becomes /ThirdParty/Include
+	'''Include'''					# Include is relative to /LibraryIntegration/, so it becomes /LibraryIntegration/Include
+]
+
+compilerExeName					= "clang++"
+
+[FileParsingSettings.Properties]
+propertySeparator = ","
+subPropertySeparator = ","
+subPropertyStartEncloser = "("
+subPropertyEndEncloser = ")"
+ignoredCharacters = [ " " ]
+
+namespaceMacroName = "RFKNamespace"
+classmacroName = "RFKClass"
+structMacroName = "RFKStruct"
+fieldMacroName = "RFKField"
+methodMacroName = "RFKMethod"
+enumMacroName = "RFKEnum"
+enumValueMacroName = "RFKEnumVal"

@@ -59,7 +59,7 @@ int main()
 	//but keep in mind that paths must be either absolute, either relative to the WORKING DIRECTORY
 	//When launching from the executable, they must be relative to the executable path.
 	//In any case, it's much safer to always provide absolute paths.
-	fileGenerator.settings.outputDirectory = generatorIntegrationPath / "Include" / "Generated";
+	fileGenerator.settings.setOutputDirectory(generatorIntegrationPath / "Include" / "Generated");
 	fileGenerator.settings.addToParseDirectory(generatorIntegrationPath / "Include");
 	fileGenerator.settings.addIgnoredDirectory(generatorIntegrationPath / "Include" / "Generated");
 
