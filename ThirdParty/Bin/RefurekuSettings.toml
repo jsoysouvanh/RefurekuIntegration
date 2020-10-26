@@ -41,7 +41,7 @@ projectIncludeDirectories		= [
 	'''Include'''					# Include is relative to /LibraryIntegration/, so it becomes /LibraryIntegration/Include
 ]
 
-compilerExeName					= "clang++"
+compilerExeName					= "msvc"
 
 [FileParsingSettings.Properties]
 propertySeparator = ","
