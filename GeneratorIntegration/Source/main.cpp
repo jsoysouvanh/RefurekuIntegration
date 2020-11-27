@@ -3,6 +3,7 @@
 #include <Kodgen/Misc/Filesystem.h>
 #include <Kodgen/Misc/DefaultLogger.h>
 
+#include <RefurekuGenerator/Parsing/FileParser.h>
 #include <RefurekuGenerator/Parsing/FileParserFactory.h>
 #include <RefurekuGenerator/CodeGen/FileGenerator.h>
 #include <RefurekuGenerator/CodeGen/FileGenerationUnit.h>
@@ -33,9 +34,9 @@ void printGenerationResult(kodgen::ILogger& logger, kodgen::FileGenerationResult
 
 int main()
 {
-	rfk::FileParserFactory	fileParserFactory;
-	rfk::FileGenerator		fileGenerator;
-	rfk::FileGenerationUnit	fileGenUnit;
+	rfk::FileParserFactory<rfk::FileParser>	fileParserFactory;
+	rfk::FileGenerator						fileGenerator;
+	rfk::FileGenerationUnit					fileGenUnit;
 
 	//Set logger
 	kodgen::DefaultLogger logger;
