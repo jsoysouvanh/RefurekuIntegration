@@ -16,14 +16,14 @@ target_include_directories(${Target}
 
 # Link against Refureku library
 target_link_directories(${Target} PRIVATE ../ThirdParty/Lib)
-target_link_libraries(${Target} PRIVATE $<IF:$<CONFIG:Debug>,RefurekuDebug,RefurekuRelease>)
+target_link_libraries(${Target} PRIVATE Refureku)
 
 # Create the command to run RefurekuGenerator
 set(RunRefurekuGenerator RunRefurekuGenerator)
 
 add_custom_target(${RunRefurekuGenerator}
 					WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}			# This is CMakeLists.txt location, which is /LibraryIntegration
-					COMMAND ../ThirdParty/Bin/RefurekuGenerator)
+					COMMAND ../ThirdParty/Bin/RefurekuGenerator ./RefurekuSettings.toml)
 
 # Run the RefurekuGenerator BEFORE building the project to refresh generated files
 add_dependencies(${Target} ${RunRefurekuGenerator})

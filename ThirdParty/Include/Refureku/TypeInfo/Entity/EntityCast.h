@@ -7,40 +7,27 @@
 
 #pragma once
 
-#include <type_traits>
-
 #include "Refureku/TypeInfo/Entity/Entity.h"
-#include "Refureku/TypeInfo/Variables/Variable.h"
-#include "Refureku/TypeInfo/Variables/Field.h"
-#include "Refureku/TypeInfo/Variables/StaticField.h"
-#include "Refureku/TypeInfo/Functions/Function.h"
-#include "Refureku/TypeInfo/Functions/Method.h"
-#include "Refureku/TypeInfo/Functions/StaticMethod.h"
-#include "Refureku/TypeInfo/Archetypes/Class.h"
-#include "Refureku/TypeInfo/Archetypes/Enum.h"
-#include "Refureku/TypeInfo/Archetypes/EnumValue.h"
-#include "Refureku/TypeInfo/Archetypes/FundamentalArchetype.h"
-#include "Refureku/TypeInfo/Namespaces/Namespace.h"
 
 namespace rfk
 {
-	namespace internal
-	{
-		template <typename T>
-		using isValidEntityType = std::enable_if_t<std::is_base_of_v<Entity, T>>;
-
-		/**
-		*	@brief Helper function to cast simple entity types.
-		*
-		*	@tparam T Concrete type to cast to.
-		*
-		*	@param entity The entity to cast.
-		*	
-		*	@return The casted entity if the entity concrete type was correct, else nullptr.
-		*/
-		template <typename T, EEntityKind CheckKind, typename = isValidEntityType<T>>
-		T const* entityCast(Entity const* entity) noexcept;
-	}
+	//Forward declarations
+	class Archetype;
+	class FundamentalArchetype;
+	class Struct;
+	class ClassTemplate;
+	class ClassTemplateInstantiation;
+	class Enum;
+	class EnumValue;
+	class Namespace;
+	class FieldBase;
+	class Field;
+	class StaticField;
+	class MethodBase;
+	class Method;
+	class StaticMethod;
+	class Variable;
+	class Function;
 
 	/**
 	*	@brief Try to cast this entity to the specified concrete type if possible.
@@ -49,56 +36,69 @@ namespace rfk
 	*	
 	*	@return The casted entity if the provided type matched the concrete entity type, else nullptr.
 	*/
-	template <typename T, typename = internal::isValidEntityType<T>>
-	T const*					entityCast(Entity const* entity)								noexcept;
+	template <typename T>
+	RFK_NODISCARD T const*											entityCast(Entity const* entity)								noexcept;
 
 	/**
 	*	rfk::entityCast<> specialization for all Entity types.
 	*/
 	template <>
-	Archetype const*			entityCast<Archetype, void>(Entity const* entity)				noexcept;
+	RFK_NODISCARD REFUREKU_API Archetype const*						entityCast<Archetype>(Entity const* entity)						noexcept;
 
 	template <>
-	FundamentalArchetype const* entityCast<FundamentalArchetype, void>(Entity const* entity)	noexcept;
+	RFK_NODISCARD REFUREKU_API FundamentalArchetype const*			entityCast<FundamentalArchetype>(Entity const* entity)			noexcept;
+
+	/**
+	*	This entity cast specialization doesn't differentiate structs and classes since they have the same static type.
+	*	Make sure to check if the result's kind is EEntityKind::Struct or EEntityKind::Class.
+	*/
+	template <>
+	RFK_NODISCARD REFUREKU_API Struct const*						entityCast<Struct>(Entity const* entity)						noexcept;
+
+	/**
+	*	This entity cast specialization doesn't differentiate structs and classes since they have the same static type.
+	*	Make sure to check if the result's kind is EEntityKind::Struct or EEntityKind::Class.
+	*/
+	template <>
+	RFK_NODISCARD REFUREKU_API ClassTemplate const*					entityCast<ClassTemplate>(Entity const* entity)					noexcept;
+
+	/**
+	*	This entity cast specialization doesn't differentiate structs and classes since they have the same static type.
+	*	Make sure to check if the result's kind is EEntityKind::Struct or EEntityKind::Class.
+	*/
+	template <>
+	RFK_NODISCARD REFUREKU_API ClassTemplateInstantiation const*	entityCast<ClassTemplateInstantiation>(Entity const* entity)	noexcept;
 
 	template <>
-	Struct const*				entityCast<Struct, void>(Entity const* entity)					noexcept;
+	RFK_NODISCARD REFUREKU_API FieldBase const*						entityCast<FieldBase>(Entity const* entity)						noexcept;
+
+	template <>	
+	RFK_NODISCARD REFUREKU_API Field const*							entityCast<Field>(Entity const* entity)							noexcept;
 
 	template <>
-	Class const*				entityCast<Class, void>(Entity const* entity)					noexcept;
+	RFK_NODISCARD REFUREKU_API StaticField const*					entityCast<StaticField>(Entity const* entity)					noexcept;
 
 	template <>
-	FieldBase const*			entityCast<FieldBase, void>(Entity const* entity)				noexcept;
+	RFK_NODISCARD REFUREKU_API MethodBase const*					entityCast<MethodBase>(Entity const* entity)					noexcept;
 
 	template <>
-	Field const*				entityCast<Field, void>(Entity const* entity)					noexcept;
+	RFK_NODISCARD REFUREKU_API Method const*						entityCast<Method>(Entity const* entity)						noexcept;
 
 	template <>
-	StaticField const*			entityCast<StaticField, void>(Entity const* entity)				noexcept;
+	RFK_NODISCARD REFUREKU_API StaticMethod const*					entityCast<StaticMethod>(Entity const* entity)					noexcept;
 
 	template <>
-	MethodBase const*			entityCast<MethodBase, void>(Entity const* entity)				noexcept;
+	RFK_NODISCARD REFUREKU_API Enum const*							entityCast<Enum>(Entity const* entity)							noexcept;
 
 	template <>
-	Method const*				entityCast<Method, void>(Entity const* entity)					noexcept;
+	RFK_NODISCARD REFUREKU_API EnumValue const*						entityCast<EnumValue>(Entity const* entity)						noexcept;
 
 	template <>
-	StaticMethod const*			entityCast<StaticMethod, void>(Entity const* entity)			noexcept;
+	RFK_NODISCARD REFUREKU_API Namespace const*						entityCast<Namespace>(Entity const* entity)						noexcept;
 
 	template <>
-	Enum const*					entityCast<Enum, void>(Entity const* entity)					noexcept;
+	RFK_NODISCARD REFUREKU_API Variable const*						entityCast<Variable>(Entity const* entity)						noexcept;
 
 	template <>
-	EnumValue const*			entityCast<EnumValue, void>(Entity const* entity)				noexcept;
-
-	template <>
-	Namespace const*			entityCast<Namespace, void>(Entity const* entity)				noexcept;
-
-	template <>
-	Variable const*				entityCast<Variable, void>(Entity const* entity)				noexcept;
-
-	template <>
-	Function const*				entityCast<Function, void>(Entity const* entity)				noexcept;
-
-	#include "Refureku/TypeInfo/Entity/EntityCast.inl"
+	RFK_NODISCARD REFUREKU_API Function const*						entityCast<Function>(Entity const* entity)						noexcept;
 }

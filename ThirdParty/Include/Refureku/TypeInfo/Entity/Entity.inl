@@ -1,5 +1,5 @@
 /**
-*	Copyright (c) 2020 Julien SOYSOUVANH - All Rights Reserved
+*	Copyright (c) 2021 Julien SOYSOUVANH - All Rights Reserved
 *
 *	This file is part of the Refureku library project which is released under the MIT License.
 *	See the README.md file for full license details.
@@ -8,54 +8,17 @@
 template <typename PropertyType, typename>
 PropertyType const* Entity::getProperty(bool isChildClassValid) const noexcept
 {
+	//Not safe if PropertyType inherits from multiple polymorphic types and rfk::Property is not the first inherited type
+	//Specified in method documentation.
 	return reinterpret_cast<PropertyType const*>(getProperty(PropertyType::staticGetArchetype(), isChildClassValid));
 }
 
-template <typename Predicate, typename>
-Property const* Entity::getProperty(Predicate predicate) const
-{
-	for (Property const* property : properties)
-	{
-		if (predicate(property))
-		{
-			return property;
-		}
-	}
-
-	return nullptr;
-}
-
 template <typename PropertyType, typename>
-std::vector<PropertyType const*> Entity::getProperties(bool isChildClassValid) const noexcept
+Vector<PropertyType const*> Entity::getProperties(bool isChildClassValid) const noexcept
 {
-	std::vector<Property const*> result = getProperties(PropertyType::staticGetArchetype(), isChildClassValid);
+	static_assert(std::is_base_of_v<Property, PropertyType>, "Can't call Entity::getProperty<> with a class that is not a subclass of rfk::Property.");
 
-	return reinterpret_cast<std::vector<PropertyType const*>&>(result);
-}
-
-template <typename Predicate, typename>
-std::vector<Property const*> Entity::getProperties(Predicate predicate) const
-{
-	std::vector<Property const*> result;
-
-	for (Property const* property : properties)
-	{
-		if (predicate(property))
-		{
-			result.emplace_back(property);
-		}
-	}
-
-	return result;
-}
-
-inline bool Entity::operator==(Entity const& other) const noexcept
-{
-	//2 entities are equal if they have the same address
-	return &other == this;
-}
-
-inline bool Entity::operator!=(Entity const& other) const noexcept
-{
-	return &other != this;
+	//Not safe if PropertyType inherits from multiple polymorphic types and rfk::Property is not the first inherited type
+	//Specified in method documentation.
+	return getProperties(PropertyType::staticGetArchetype(), isChildClassValid);
 }

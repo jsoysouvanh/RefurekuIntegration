@@ -8,7 +8,7 @@
 #pragma once
 
 #include "Refureku/Misc/FundamentalTypes.h"
-#include "Refureku/Utility/EnumMacros.h"
+#include "Refureku/Misc/EnumMacros.h"
 
 namespace rfk
 {
@@ -45,5 +45,5 @@ namespace rfk
 		Const			= 1 << 9
 	};
 
-	GENERATE_ENUM_OPERATORS(EMethodFlags)
+	RFK_GENERATE_ENUM_OPERATORS(EMethodFlags)
 }

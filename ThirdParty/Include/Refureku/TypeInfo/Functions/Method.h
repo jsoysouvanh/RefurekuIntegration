@@ -1,5 +1,5 @@
 /**
-*	Copyright (c) 2020 Julien SOYSOUVANH - All Rights Reserved
+*	Copyright (c) 2021 Julien SOYSOUVANH - All Rights Reserved
 *
 *	This file is part of the Refureku library project which is released under the MIT License.
 *	See the README.md file for full license details.
@@ -7,127 +7,113 @@
 
 #pragma once
 
-#include <string>
+#include <type_traits>	//std::enable_if_v, std::is_const_v
 
-#include "Refureku/Misc/FundamentalTypes.h"
 #include "Refureku/TypeInfo/Functions/MethodBase.h"
 #include "Refureku/TypeInfo/Functions/MemberFunction.h"
 
 namespace rfk
 {
-	class Struct;	//Forward declaration
-
 	class Method final : public MethodBase
 	{
-		private:
-			class DummyClass {};
-
-			/**
-			*	@brief Invoke the internal method using passed arguments.
-			*	
-			*	@tparam		ReturnType Return type of the internal method.
-			*	@tparam...	ArgTypes Passed argument types.
-			*
-			*	@param		caller Pointer to the object the internal method should be called on.
-			*	@param...	arguments Arguments to forward to the internal method.
-			*	
-			*	@return The result of the internal method call.
-			*/
-			template <typename ReturnType, typename... ArgTypes>
-			ReturnType	internalInvoke(void const* caller, ArgTypes&&... arguments)	const	noexcept;
-
 		public:
-			Method()											= delete;
-			Method(std::string&&				methodName,
-				   uint64						methodId,
-				   Type const&					returnType,
-				   std::unique_ptr<ICallable>&&	internalMethod,
-				   EMethodFlags					flags)			noexcept;
-			Method(Method const&)								= delete;
-			Method(Method&&)									= delete;
-			~Method()											= default;
+			REFUREKU_INTERNAL Method(char const*		name,
+										std::size_t		id,
+										Type const&		returnType,
+										ICallable*		internalMethod,
+										EMethodFlags	flags,
+										Entity const*	outerEntity)	noexcept;
+			REFUREKU_INTERNAL Method(Method&&)							noexcept;
+			REFUREKU_INTERNAL ~Method()									noexcept;
 
 			/**
-			*	@brief Call the method on an instance with the provided argument(s) if any, and return the result.
+			*	@brief	Call the function with the forwarded argument(s) if any, and return the result.
+			*			Providing bad return type / parameters is undefined behaviour.
+			*			**WARNING**: Template type deduction might forward wrong types to the function
+			*			(int instead of int8_t or char* instead of std::string for example), so it is recommended
+			*			to explicitly specify all template types when calling the function.
 			*
-			*	In debug mode (NDEBUG macro not defined), checks that the correct number of
-			*	arguments is passed to the method call before actually invoking the underlying method.
-			*	If it is incorrect, a MethodError exception is thrown.
-			*	Type checks are not performed so calling this method with bad parameters might lead to a crash.
+			*	@tparam ReturnType	Return type of the function.
+			*	@tparam CallerType	Type of the calling struct/class.
+			*	@tparam... ArgTypes	Type of all arguments. This can in some cases be omitted thanks to template deduction.
 			*
-			*	@tparam ReturnType Return type of the method
-			*	@tparam... ArgTypes Type of all arguments
-			*
-			*	@param caller Pointer to the instance of the class the method will be called.
-			*	@param arguments Arguments provided to the method call. This can in some cases be omitted thanks to template deduction.
-			*
-			*	@return The result of the method call.
+			*	@param args Arguments forwarded to the function call.
+			* 
+			*	@return The result of the function call.
+			* 
+			*	@exception Any exception potentially thrown from the underlying function.
+			*	@exception ConstViolation if the caller is const but the method is non-const.
 			*/
-			template <typename ReturnType, typename... ArgTypes>
-			ReturnType	rInvoke(void const* caller, ArgTypes&&... arguments)		const noexcept(REFUREKU_RELEASE);
+			template <typename ReturnType = void, typename CallerType, typename... ArgTypes, typename = std::enable_if_t<!std::is_const_v<CallerType>>>
+			ReturnType			invoke(CallerType& caller, ArgTypes&&... args)				const;
+			template <typename ReturnType = void, typename CallerType, typename... ArgTypes>
+			ReturnType			invoke(CallerType const& caller, ArgTypes&&... args)		const;
 
 			/**
-			*	@brief Call the method on an instance with the provided argument(s) if any.
+			*	@brief	Call the function with the forwarded argument(s) if any, and return the result.
+			*			The return type and arguments types will be strictly checked before calling the function.
+			*			If there is any mismatch, ArgCountMismatch, ArgTypeMismatch or ReturnTypeMismatch will be thrown.
+			*			**WARNING 1**: Unreflected archetypes can't be compared, so they will pass through the type checks.
+			*			**WARNING 2**: Template type deduction might forward wrong types to the function
+			*			(int instead of int8_t or char* instead of std::string for example), so it is recommended
+			*			to explicitly specify all template types when calling the function.
 			*
-			*	In debug mode (NDEBUG macro not defined), checks that the correct number of
-			*	arguments is passed to the method call before actually invoking the underlying method.
-			*	If it is incorrect, a MethodError exception is thrown.
-			*	Type checks are not performed so calling this method with bad parameters might lead to a crash.
+			*	@tparam ReturnType	Return type of the function.
+			*	@tparam CallerType	Type of the calling struct/class.
+			*	@tparam... ArgTypes	Type of all arguments. This can in some cases be omitted thanks to template deduction.
 			*
-			*	@note This is only an overload of the other invoke method.
-			*		  This allows to conveniently call methods when we don't care about the returned value.
+			*	@param args Arguments forwarded to the function call.
 			*
-			*	@tparam... ArgTypes Type of all arguments. This can in some cases be omitted thanks to template deduction.
-			*
-			*	@param caller Pointer to the instance of the class the method will be called.
-			*	@param arguments Arguments provided to the method call.
+			*	@return The result of the function call.
+			* 
+			*	@exception	ArgCountMismatch if sizeof...(ArgTypes) is not the same as the value returned by getParametersCount().
+			*	@exception	ArgTypeMismatch if ArgTypes... are not strictly the same as this function parameter types.
+			*				**WARNING**: Be careful to template deduction.
+			*	@exception	ReturnTypeMismatch if ReturnType is not strictly the same as this function return type.
+			*	@exception	Any exception potentially thrown from the underlying function.
 			*/
-			template <typename... ArgTypes>
-			void		invoke(void const* caller, ArgTypes&&... arguments)			const noexcept(REFUREKU_RELEASE);
+			template <typename ReturnType = void, typename CallerType, typename... ArgTypes, typename = std::enable_if_t<!std::is_const_v<CallerType>>>
+			ReturnType			checkedInvoke(CallerType& caller, ArgTypes&&... args)		const;
+			template <typename ReturnType = void, typename CallerType, typename... ArgTypes>
+			ReturnType			checkedInvoke(CallerType const& caller, ArgTypes&&... args)	const;
 
 			/**
-			*	@brief Call the method on an instance with the provided argument(s) if any, and return the result.
-			*
-			*	Checks the argument count and the type of each argument before actually invoking the underlying method.
-			*	If any of those is incorrect, a MethodError exception is thrown.
-			*
-			*	@tparam ReturnType Return type of the method
-			*	@tparam... ArgTypes Type of all arguments. This can in some cases be omitted thanks to template deduction,
-			*		but it is always safer to explicitly specify each template type to avoid type mismatches (a char* could
-			*		be template deducted as a char[], and as they are different types a MethodError exception will be thrown).
-			*
-			*	@param caller Pointer to the instance of the class the method will be called.
-			*	@param arguments Arguments provided to the method call.
-			*
-			*	@return The result of the method call.
+			*	@brief	Inherit from the properties this method overrides.
+			*			If the method is not an override, this method does nothing.
 			*/
-			template <typename ReturnType, typename... ArgTypes>
-			ReturnType	checkedRInvoke(void const* caller, ArgTypes&&... arguments)	const;
+			REFUREKU_API void	inheritBaseMethodProperties()										noexcept;
+
+		private:
+			//Forward declaration
+			class MethodImpl;
 
 			/**
-			*	@brief Call the method on an instance with the provided argument(s) if any.
+			*	@brief Call the underlying method with the forwarded args.
+			* 
+			*	@tparam ReturnType	Return type of the method.
+			*	@tparam CallerType	Type of the calling struct/class.
+			*	@tparam... ArgTypes	Type of all arguments.
 			*
-			*	Checks the argument count and the type of each argument before actually invoking the underlying method.
-			*	If any of those is incorrect, a MethodError exception is thrown.
+			*	@param caller	Reference to the caller struct/class.
+			*	@param args		Arguments forwarded to the underlying method call.
 			*
-			*	@note This is only an overload of the other checkedInvoke method.
-			*		  This allows to conveniently call methods when we don't care about the returned value.
-			*
-			*	@tparam... ArgTypes Type of all arguments. This can in some cases be omitted thanks to template deduction,
-			*		but it is always safer to explicitly specify each template type to avoid type mismatches (a char* could
-			*		be template deducted as a char[], and as they are different types a MethodError exception will be thrown).
-			*
-			*	@param caller Pointer to the instance of the class the method will be called.
-			*	@param arguments Arguments provided to the method call.
+			*	@return The result of the underlying method call.
 			*/
-			template <typename... ArgTypes>
-			void		checkedInvoke(void const* caller, ArgTypes&&... arguments)	const;
+			template <typename ReturnType, typename CallerType, typename... ArgTypes>
+			ReturnType						internalInvoke(CallerType& caller, ArgTypes&&... args)			const;
+			template <typename ReturnType, typename CallerType, typename... ArgTypes>
+			ReturnType						internalInvoke(CallerType const& caller, ArgTypes&&... args)	const;
 
 			/**
-			*	@brief Inherit from the properties this method overrides (if it has the override method flag).
+			*	@brief Throw a const violation exception with the provided message.
+			* 
+			*	@param message Message forwarded to the exception.
 			*/
-			void		inheritBaseMethodProperties()	noexcept;
+			RFK_NORETURN REFUREKU_API void	throwConstViolationException(char const* message)				const;
 	};
+
+	REFUREKU_TEMPLATE_API(rfk::Allocator<Method const*>);
+	REFUREKU_TEMPLATE_API(rfk::Vector<Method const*, rfk::Allocator<Method const*>>);
 
 	#include "Refureku/TypeInfo/Functions/Method.inl"
 }

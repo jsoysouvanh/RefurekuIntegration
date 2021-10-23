@@ -1,5 +1,5 @@
 /**
-*	Copyright (c) 2020 Julien SOYSOUVANH - All Rights Reserved
+*	Copyright (c) 2021 Julien SOYSOUVANH - All Rights Reserved
 *
 *	This file is part of the Refureku library project which is released under the MIT License.
 *	See the README.md file for full license details.
@@ -7,76 +7,109 @@
 
 #pragma once
 
-#include <type_traits>
-#include <cstring>		//std::memcpy
-#include <utility>		//std::forward
-#include <cassert>
-
 #include "Refureku/TypeInfo/Variables/VariableBase.h"
 #include "Refureku/TypeInfo/Variables/EVarFlags.h"
-#include "Refureku/Misc/FundamentalTypes.h"
 
 namespace rfk
 {
 	class Variable final : public VariableBase
 	{
 		public:
-			/** Address of this variable in memory. */
-			void*		address	= nullptr;
-
-			/** Flags describing this variable. */
-			EVarFlags	flags	= EVarFlags::Default;
-
-			Variable()							= delete;
-			Variable(std::string&&	name,
-					 uint64			id,
-					 Type const&	type,
-					 void*			address,
-					 EVarFlags		flags)		noexcept;
-			Variable(Variable const&)			= delete;
-			Variable(Variable&&)				= delete;
-			~Variable()							= default;
+			REFUREKU_API		Variable(char const*	name,
+										 std::size_t	id,
+										 Type const&	type,
+										 void*			ptr,
+										 EVarFlags		flags)		noexcept;
+			REFUREKU_API		Variable(char const*	name,
+										 std::size_t	id,
+										 Type const&	type,
+										 void const*	constPtr,
+										 EVarFlags		flags)		noexcept;
+			REFUREKU_INTERNAL	Variable(Variable&&)				noexcept;
+			REFUREKU_API		~Variable()							noexcept;
 
 			/**
-			*	@brief Get the data stored in this variable.
-			*		   This method in not safe if you provide a wrong DataType.
+			*	@brief Get the value stored in this variable.
+			*		   This method in not safe if you provide a wrong ValueType.
 			*
-			*	@tparam DataType Type of the data stored in the field.
-			*			If DataType is an rvalue reference, the data is moved into the return value (so the variable is no longer safe to get).
-			*			If DataType is an lvalue reference, return a reference to the variable.
-			*			If DataType is a value type, the data is copied. If it is a struct/class, DataType must be copy-constructible.
-			*
-			*	@return The data stored in the variable.
+			*	@tparam ValueType Type of the value stored in the field.
+			*			If ValueType is an rvalue reference, the value is moved into the return value (so the variable is no longer safe to get).
+			*			If ValueType is an lvalue reference, return a reference to the variable.
+			*			If ValueType is a value type, the value is copied. If it is a struct/class, ValueType must be copy-constructible.
+			* 
+			*	@return The value stored in the variable.
+			* 
+			*	@exception ConstViolation if:
+			*		- the field is const and ValueType is an RValue type (can't move a const field content);
+			*		- the field is const and ValueType is a non-const reference;
 			*/
-			template <typename DataType>
-			DataType		getData()									const noexcept;
+			template <typename ValueType>
+			RFK_NODISCARD ValueType					get()							const;
 
 			/**
-			*	@brief Set some data in this variable.
-			*		   This method is not safe if you provide a wrong DataType.
+			*	@brief Set some value in this variable.
+			*		   This method is not safe if you provide a wrong ValueType.
 			*
-			*	@tparam DataType Type of the data to store in the variable.
-			*			If DataType is an rvalue reference, the data is forwarded into the variable.
-			*			If DataType is an lvalue reference, the data is copied into the variable.
+			*	@tparam ValueType Type of the value to store in the variable.
+			*			If ValueType is an rvalue reference, the value is forwarded into the variable.
+			*			If ValueType is an lvalue reference, the value is copied into the variable.
+			* 
+			*	@exception ConstViolation if the variable is actually const and therefore readonly.
 			*/
-			template <typename DataType>
-			void			setData(DataType&& data)					const noexcept;
+			template <typename ValueType>
+			void									set(ValueType&& value)			const;
 
 			/**
-			*	@brief Copy dataSize bytes starting from data into the variable.
+			*	@brief Copy dataSize bytes starting from value into the variable.
 			*
-			*	@param data Address of the data to copy.
-			*	@param dataSize Number of bytes to copy into the variable starting from data.
+			*	@param valuePtr		Pointer to the value to copy.
+			*	@param valueSize	Number of bytes to copy into the variable.
+			* 
+			*	@exception ConstViolation if the variable is actually const and therefore readonly.
 			*/
-			inline void		setData(void const* data, uint64 dataSize)	const noexcept;
+			REFUREKU_API void						set(void const* valuePtr,
+														std::size_t valueSize)		const;
 
 			/**
 			*	@brief Check if this variable is static.
 			*
 			*	@return true if the variable is static, else false.
 			*/
-			bool			isStatic()									const noexcept;
+			RFK_NODISCARD REFUREKU_API bool			isStatic()						const	noexcept;
+
+			/**
+			*	@brief Getter for the field _flags.
+			* 
+			*	@return _flags.
+			*/
+			RFK_NODISCARD REFUREKU_API EVarFlags	getFlags()						const	noexcept;
+
+			/**
+			*	@brief	Get a non-const pointer to this variable.
+			*			Performing non-const operations with the pointer if the variable is const is undefined behaviour.
+			* 
+			*	@return A pointer to this static field.
+			* 
+			*	@exception ConstViolation if the variable is actually const.
+			*/
+			RFK_NODISCARD REFUREKU_API void*		getPtr()						const;
+
+			/**
+			*	@brief	Get a const pointer to this static field.
+			* 
+			*	@return A const pointer to this static field.
+			*/
+			RFK_NODISCARD REFUREKU_API void const*	getConstPtr()					const	noexcept;
+
+		protected:
+			//Forward declaration
+			class VariableImpl;
+
+			RFK_GEN_GET_PIMPL(VariableImpl, Entity::getPimpl())
 	};
+
+	REFUREKU_TEMPLATE_API(rfk::Allocator<Variable const*>);
+	REFUREKU_TEMPLATE_API(rfk::Vector<Variable const*, rfk::Allocator<Variable const*>>);
 
 	#include "Refureku/TypeInfo/Variables/Variable.inl"
 }

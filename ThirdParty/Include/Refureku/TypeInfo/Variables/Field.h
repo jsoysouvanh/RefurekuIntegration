@@ -1,5 +1,5 @@
 /**
-*	Copyright (c) 2020 Julien SOYSOUVANH - All Rights Reserved
+*	Copyright (c) 2021 Julien SOYSOUVANH - All Rights Reserved
 *
 *	This file is part of the Refureku library project which is released under the MIT License.
 *	See the README.md file for full license details.
@@ -7,111 +7,142 @@
 
 #pragma once
 
-#include <cassert>
-#include <type_traits>
-#include <cstring>	//std::memcpy
-#include <utility>	//std::forward
-
 #include "Refureku/TypeInfo/Variables/FieldBase.h"
-#include "Refureku/TypeInfo/Type.h"
 
 namespace rfk
 {
 	class Field final : public FieldBase
 	{
 		public:
-			/** Memory offset in bytes of this field in its owner class */
-			uint64	memoryOffset	= 0u;
-
-			Field()								= delete;
-			Field(std::string&&	name,
-				  uint64		id,
-				  Type const&	type,
-				  EFieldFlags	flags,
-				  Struct const*	ownerStruct,
-				  uint64		memoryOffset)	noexcept;
-			Field(Field const&)					= delete;
-			Field(Field&&)						= delete;
-			~Field()							= default;
+			REFUREKU_INTERNAL Field(char const*		name,
+									std::size_t		id,
+									Type const&		type,
+									EFieldFlags		flags,
+									Struct const*	owner,
+									std::size_t		memoryOffset,
+									Entity const*	outerEntity = nullptr)	noexcept;
+			REFUREKU_INTERNAL Field(Field&&)								noexcept;
+			REFUREKU_INTERNAL ~Field()										noexcept;
 
 			/**
-			*	@brief Get the data corresponding to this field in the provided instance.
-			*		   This method in not safe if you provide a wrong DataType.
+			*	@brief Get the value corresponding to this field in the provided instance.
+			*		   This method in not safe if you provide a wrong ValueType.
 			*
-			*	\tparam DataType Type to retrieve from the field.
-			*		If DataType is an rvalue reference, the data is moved into the return value (so the class data is no longer safe to use).
-			*		If DataType is an lvalue reference, return a reference to the field.
-			*		If DataType is a value type, the data is copied. If it is a class, DataType must be copy-constructible.
+			*	@tparam ValueType Type to retrieve from the field.
+			*		If ValueType is an rvalue reference, the field value is moved into the return value (so the field value is no longer safe to use).
+			*		If ValueType is an lvalue reference, return a reference to the field.
+			*		If ValueType is a value type, the value is copied. If it is a class, ValueType must be copy-constructible.
 			*
-			*	@param instance Instance we retrieve the data from.
+			*	@param instance Instance we retrieve the value from.
+			* 
+			*	@exception ConstViolation if:
+			*		- the field is const and ValueType is an RValue type (can't move a const field content);
+			*		- the field is const and ValueType is a non-const reference;
 			*
-			*	@return The queried data in the instance.
+			*	@return The queried value in the instance.
 			*/
-			template <typename DataType>
-			DataType			getData(void* instance)										const noexcept;
+			template <typename ValueType, typename OwnerStructType, typename = std::enable_if_t<is_value_v<OwnerStructType>>>
+			RFK_NODISCARD ValueType		get(OwnerStructType& instance)					const;
 
 			/**
-			*	@brief Get the data corresponding to this field in the provided instance.
-			*		   This method in not safe if you provide a wrong DataType.
+			*	@brief Get the value corresponding to this field in the provided instance.
+			*		   This method in not safe if you provide a wrong ValueType.
 
-			*	\note This is only an overload of the same method with a const instance.
+			*	@note This is only an overload of the same method with a const instance.
 			*
-			*	\tparam DataType Type to retrieve from the field.
-			*		If DataType is an rvalue reference, the data is moved into the return value (so the class data is no longer safe to use).
-			*		If DataType is an lvalue reference, return a reference to the field.
-			*		If DataType is a value type, the data is copied. If it is a class, DataType must be copy-constructible.
+			*	@tparam ValueType Type to retrieve from the field.
+			*		If ValueType is an rvalue reference, the value is moved into the return value (so the class value is no longer safe to use).
+			*		If ValueType is an lvalue reference, return a reference to the field.
+			*		If ValueType is a value type, the value is copied. If it is a class, ValueType must be copy-constructible.
 			*
-			*	@param instance Instance we retrieve the data from.
+			*	@param instance Instance we retrieve the value from.
 			*
-			*	@return The queried data in the instance.
+			*	@return The queried value in the instance.
 			*/
-			template <typename DataType>
-			DataType			getData(void const* instance)								const noexcept;
-
-			
-			/**
-			*	@brief Set the data corresponding to this field in the provided instance.
-			*		   This method is not safe if you provide a wrong DataType.
-			*
-			*	\tparam DataType Type to write into the field.
-			*		If DataType is an rvalue reference, the data is forwarded into the instance.
-			*		If DataType is an lvalue reference, the data is copied into the instance.
-			*
-			*	@param instance Instance we set the data in.
-			*	@param data Data to set in the instance.
-			*/
-			template <typename DataType>
-			void				setData(void* instance, DataType&& data)					const noexcept;
+			template <typename ValueType, typename OwnerStructType, typename = std::enable_if_t<is_value_v<OwnerStructType>>>
+			RFK_NODISCARD ValueType		get(OwnerStructType const& instance)			const;
 
 			/**
-			*	@brief Copy dataSize bytes starting from data into this field's address in instance.
+			*	@brief Set the value corresponding to this field in the provided instance.
+			*		   This method is not safe if you provide a wrong ValueType.
 			*
-			*	@param instance Instance we write the bytes in.
-			*	@param data Start address of the written bytes.
-			*	@param dataSize Number of bytes to copy
+			*	@tparam ValueType Type to write into the field.
+			*		If ValueType is an rvalue reference, the value is forwarded into the instance.
+			*		If ValueType is an lvalue reference, the value is copied into the instance.
+			*
+			*	@param instance Instance we set the value in.
+			*	@param value Data to set in the instance.
+			* 
+			*	@exception ConstViolation if the field is actually const and therefore readonly.
 			*/
-			inline void			setData(void* instance, void const* data, uint64 dataSize)	const noexcept;
+			template <typename ValueType, typename OwnerStructType, typename = std::enable_if_t<is_value_v<OwnerStructType>>>
+			void						set(OwnerStructType&	instance,
+											ValueType&&			value)					const;
 
 			/**
-			*	@brief Get the data address corresponding to this field in the provided instance.
+			*	@brief Copy valueSize bytes starting from valuePtr into this field's address in instance.
 			*
-			*	@param instance Instance we get the data address from.
-			*
-			*	@return Address of the data in instance.
+			*	@param instance		Instance we write the bytes in.
+			*	@param valuePtr		Pointer to the value to copy.
+			*	@param valueSize	Number of bytes to copy into the field.
+			* 
+			*	@exception ConstViolation if the field is actually const and therefore readonly.
 			*/
-			inline void*		getDataAddress(void* instance)								const noexcept;
+			template <typename OwnerStructType, typename = std::enable_if_t<is_value_v<OwnerStructType>>>
+			void						set(OwnerStructType&	instance,
+											void const*			valuePtr,
+											std::size_t			valueSize)				const;
 
 			/**
-			*	@brief Get the data address corresponding to this field in the provided instance.
+			*	@brief	Get a pointer to this field in the provided instance.
 			*
-			*	\note This is only an overload of the same method with a const instance.
+			*	@param instance Instance we get the field from.
 			*
-			*	@param instance Instance we get the data address from.
-			*
-			*	@return Address of the data in instance.
+			*	@return Pointer to this field in the provided instance.
+			* 
+			*	@exception ConstViolation if the field is actually const.
 			*/
-			inline void const*	getDataAddress(void const* instance)						const noexcept;
+			template <typename OwnerStructType, typename = std::enable_if_t<is_value_v<OwnerStructType>>>
+			RFK_NODISCARD void*			getPtr(OwnerStructType& instance)				const;
+
+			/**
+			*	@brief Get a const pointer to this field in the provided instance.
+			*
+			*	@param instance Instance we get the field from.
+			*
+			*	@return Const pointer to this field in the provided instance.
+			*/
+			template <typename OwnerStructType, typename = std::enable_if_t<is_value_v<OwnerStructType>>>
+			RFK_NODISCARD void const*	getConstPtr(OwnerStructType const& instance)	const	noexcept;
+
+		protected:
+			//Forward declaration
+			class FieldImpl;
+
+			RFK_GEN_GET_PIMPL(FieldImpl, Entity::getPimpl())
+
+		private:
+			template <typename ValueType>
+			RFK_NODISCARD ValueType					getInternal(void* instance)					const;
+
+			template <typename ValueType>
+			RFK_NODISCARD ValueType const			getInternal(void const* instance)			const	noexcept;
+
+			template <typename ValueType>
+			void									setInternal(void*		instance,
+																ValueType&&	value)				const;
+
+			REFUREKU_API void						setInternal(void*		instance,
+																void const* valuePtr,
+																std::size_t	valueSize)			const;
+
+			RFK_NODISCARD REFUREKU_API void*		getPtrInternal(void* instance)				const;
+
+			RFK_NODISCARD REFUREKU_API void const*	getConstPtrInternal(void const* instance)	const	noexcept;
 	};
+
+	REFUREKU_TEMPLATE_API(rfk::Allocator<Field const*>);
+	REFUREKU_TEMPLATE_API(rfk::Vector<Field const*, rfk::Allocator<Field const*>>);
 
 	#include "Refureku/TypeInfo/Variables/Field.inl"
 }

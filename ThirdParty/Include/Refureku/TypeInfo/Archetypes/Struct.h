@@ -1,5 +1,5 @@
 /**
-*	Copyright (c) 2020 Julien SOYSOUVANH - All Rights Reserved
+*	Copyright (c) 2021 Julien SOYSOUVANH - All Rights Reserved
 *
 *	This file is part of the Refureku library project which is released under the MIT License.
 *	See the README.md file for full license details.
@@ -7,114 +7,111 @@
 
 #pragma once
 
-#include <cassert>
-#include <vector>
-#include <unordered_set>
-#include <algorithm>
-#include <type_traits>
+#include <type_traits> //std::is_default_constructible_v, std::is_pointer_v, std::is_reference_v
 
 #include "Refureku/TypeInfo/Archetypes/Archetype.h"
-#include "Refureku/TypeInfo/Variables/Field.h"
-#include "Refureku/TypeInfo/Variables/StaticField.h"
-#include "Refureku/TypeInfo/Functions/Method.h"
-#include "Refureku/TypeInfo/Functions/StaticMethod.h"
+#include "Refureku/TypeInfo/Functions/StaticMethod.h"	//makeInstance<> uses StaticMethod wrapper so must include
+#include "Refureku/TypeInfo/Archetypes/EClassKind.h"
+#include "Refureku/TypeInfo/Variables/EFieldFlags.h"
+#include "Refureku/TypeInfo/Functions/EMethodFlags.h"
 #include "Refureku/TypeInfo/Functions/MethodHelper.h"
-#include "Refureku/Utility/TypeTraits.h"
+#include "Refureku/Misc/SharedPtr.h"
 
 namespace rfk
 {
 	//Forward declarations
-	class Class;
+	class ParentStruct;
 	class Enum;
+	class Field;
+	class StaticField;
+	class Method;
+	class Type;
+	class ICallable;
+	class Struct;
+	
+	/* In C++, a struct and a class contains exactly the same data. Alias for convenience. */
+	using Class = Struct;
 
 	class Struct : public Archetype
 	{
-		private:
-			/** Pointer to the default method used to make an instance of this archetype. */
-			void*								(*_defaultInstantiator)() = nullptr;
-
-			/** List of all custom instantiators for this archetype. */
-			std::vector<StaticMethod const*>	customInstantiators;
-
-			template <typename ReturnType, typename... ArgTypes>
-			ReturnType* makeInstanceFromCustomInstantiator(ArgTypes&&... args)	const;
-
-		protected:
-			Struct(std::string&&	name,
-				   uint64			id,
-				   EEntityKind		kind,
-				   uint64			memorySize)	noexcept;
-
 		public:
-			struct Parent
-			{
-				struct Hasher
-				{
-					size_t operator()(rfk::Struct::Parent const& parent) const
-					{
-						return std::hash<rfk::Struct const*>()(parent.type);
-					}
-				};
-
-				struct Equal
-				{
-					bool operator()(rfk::Struct::Parent const& p1, rfk::Struct::Parent const& p2) const
-					{
-						return p1.type == p2.type;
-					}
-				};
-
-				EAccessSpecifier	access;
-				Struct const*		type;
-			};
-
-			/** Structs this struct inherits directly in its declaration. This list includes ONLY reflected parents. */
-			std::unordered_set<Parent, Parent::Hasher, Parent::Equal>							directParents;
-
-			/** Classes/Structs inheriting from this struct, regardless of their inheritance depth. This list includes ONLY reflected children. */
-			std::unordered_set<Struct const*>													children;
-
-			/** All tagged nested structs/classes/enums contained in this struct. */
-			std::unordered_set<Archetype const*, Entity::PtrNameHasher, Entity::PtrEqualName>	nestedArchetypes;
-
-			/** All tagged fields contained in this struct, may they be declared in this struct or one of its parents. */
-			std::unordered_multiset<Field, Entity::NameHasher, Entity::EqualName>				fields;
-
-			/** All tagged static fields contained in this struct, may they be declared in this struct or one of its parents. */
-			std::unordered_multiset<StaticField, Entity::NameHasher, Entity::EqualName>			staticFields;
-
-			/** All tagged methods declared in this struct. */
-			std::unordered_multiset<Method, Entity::NameHasher, Entity::EqualName>				methods;
-
-			/** All tagged static methods declared in this struct. */
-			std::unordered_multiset<StaticMethod, Entity::NameHasher, Entity::EqualName>		staticMethods;
-
-			Struct(std::string&&	newName,
-				   uint64			newId,
-				   uint64			newMemorySize)	noexcept;
-			Struct(Struct const&)					= delete;
-			Struct(Struct&&)						= delete;
-			~Struct()								= default;
+			REFUREKU_API Struct(char const*	name,
+								std::size_t	id,
+								std::size_t	memorySize,
+								bool		isClass)	noexcept;
+			REFUREKU_API ~Struct()						noexcept;
 
 			/**
-			*	@brief Retrieve from this struct a nested archetype matching with a given predicate.
-			*	
-			*	@param predicate Predicate returning true for any matching archetype.
-			*	
-			*	@return The first matching archetype if any is found, else nullptr.
+			*	@brief	Make an instance of the class represented by this archetype with the matching instantiator.
+			*			One can add new instantiators to any class by using the Instantiator method property.
+			*
+			*	@return An instance of this struct if a suitable instantiator was found, else nullptr.
+			* 
+			*	@exception Any exception potentially thrown by the used instantiator.
 			*/
-			template <typename Predicate, typename = std::enable_if_t<std::is_invocable_r_v<bool, Predicate, Archetype const*>>>
-			Archetype const*					getNestedArchetype(Predicate predicate)												const;
+			template <typename ReturnType, typename... ArgTypes>
+			RFK_NODISCARD 
+				rfk::SharedPtr<ReturnType>			makeSharedInstance(ArgTypes&&... args)												const;
 
 			/**
-			*	@brief Retrieve from this struct a nested struct matching with a given predicate.
-			*	
-			*	@param predicate Predicate returning true for any matching struct.
-			*	
-			*	@return The first matching struct if any is found, else nullptr.
+			*	@brief	Compute the list of all direct reflected subclasses of this struct.
+			*			Direct subclasses are computed by iterating over all subclasses (direct or not), so this method
+			*			might have a heavy performance cost on big class hierarchies.
+			* 
+			*	@return A list of all direct reflected subclasses of this struct.
 			*/
-			template <typename Predicate, typename = std::enable_if_t<std::is_invocable_r_v<bool, Predicate, Struct const*>>>
-			Struct const*						getNestedStruct(Predicate predicate)												const;
+			RFK_NODISCARD REFUREKU_API
+				Vector<Struct const*>				getDirectSubclasses()																const	noexcept;
+
+			/**
+			*	@brief Check if this struct is a subclass of another struct/class.
+			* 
+			*	@param archetype Archetype of the tested parent struct/class.
+			* 
+			*	@return true if this struct is a subclass of the provided archetype, else false.
+			*			Note that if the provided archetype is the same as this struct, false is returned.
+			*/
+			RFK_NODISCARD REFUREKU_API bool			isSubclassOf(Struct const& archetype)												const	noexcept;
+
+			/**
+			*	@brief Check if this struct is a base class of another struct/class.
+			* 
+			*	@param archetype Archetype of the tested child struct/class.
+			* 
+			*	@return true if this struct is a base class of the provided archetype, else false.
+			*			Note that if the provided archetype is the same as this struct, true is returned.
+			*/
+			RFK_NODISCARD REFUREKU_API bool			isBaseOf(Struct const& archetype)													const	noexcept;
+
+			/**
+			*	@brief	Get the index'th direct parent of this struct.
+			*			If index is greater or equal to getDirectParentsCount(), the behaviour is undefined.
+			* 
+			*	@return The index'th direct parent of this struct.
+			*/
+			RFK_NODISCARD REFUREKU_API 
+				ParentStruct const&					getDirectParentAt(std::size_t index)												const	noexcept;
+
+			/**
+			*	@brief Get the number of reflected direct parents this struct is inheriting from.
+			* 
+			*	@return The number of direct parents this struct is inheriting from.
+			*/
+			RFK_NODISCARD REFUREKU_API std::size_t	getDirectParentsCount()																const	noexcept;
+
+			/**
+			*	@brief Execute the given visitor on all direct parents of this struct.
+			* 
+			*	@param visitor	Visitor function to call. Return false to abort the foreach loop.
+			*	@param userData	Optional user data forwarded to the visitor.
+			* 
+			*	@return	The last visitor result before exiting the loop.
+			*			If the visitor is nullptr, return false.
+			* 
+			*	@exception Any exception potentially thrown from the provided visitor.
+			*/
+			REFUREKU_API bool						foreachDirectParent(Visitor<ParentStruct>	visitor,
+																		void*					userData)								const;
 
 			/**
 			*	@param structName	Name of the nested struct to look for.
@@ -122,18 +119,37 @@ namespace rfk
 			*
 			*	@return The found nested struct if any, else nullptr.
 			*/
-			Struct const*						getNestedStruct(std::string			structName,
-																EAccessSpecifier	access = EAccessSpecifier::Undefined)			const	noexcept;
+			RFK_NODISCARD REFUREKU_API 
+				Struct const*						getNestedStructByName(char const*		name,
+																		  EAccessSpecifier	access = EAccessSpecifier::Undefined)		const	noexcept;
 
 			/**
-			*	@brief Retrieve from this struct a nested class matching with a given predicate.
+			*	@brief Retrieve the first nested struct satisfying the provided predicate.
 			*	
-			*	@param predicate Predicate returning true for any matching class.
-			*	
-			*	@return The first matching class if any is found, else nullptr.
+			*	@param predicate	Predicate defining a valid nested struct.
+			*	@param userData		User data forwarded to the predicate calls.
+			* 
+			*	@return The first found nested struct satisfying the predicate if any, else nullptr.
+			* 
+			*	@exception Any exception potentially thrown from the provided predicate.
 			*/
-			template <typename Predicate, typename = std::enable_if_t<std::is_invocable_r_v<bool, Predicate, Class const*>>>
-			Class const*						getNestedClass(Predicate predicate)													const;
+			RFK_NODISCARD REFUREKU_API 
+				Struct const*						getNestedStructByPredicate(Predicate<Struct>	predicate,
+																			   void*				userData)							const;
+
+			/**
+			*	@brief Retrieve all nested structs satisfying the provided predicate.
+			*	
+			*	@param predicate	Predicate defining a valid nested struct.
+			*	@param userData		User data forwarded to the predicate calls.
+			* 
+			*	@return All nested structs satisfying the predicate.
+			* 
+			*	@exception Any exception potentially thrown from the provided predicate.
+			*/
+			RFK_NODISCARD REFUREKU_API 
+				Vector<Struct const*>				getNestedStructsByPredicate(Predicate<Struct>	predicate,
+																				void*				userData)							const;
 
 			/**
 			*	@param className	Name of the nested class to look for.
@@ -141,18 +157,37 @@ namespace rfk
 			*
 			*	@return The found nested class if any, else nullptr.
 			*/
-			Class const*						getNestedClass(std::string			className,
-																EAccessSpecifier	access = EAccessSpecifier::Undefined)			const	noexcept;
+			RFK_NODISCARD REFUREKU_API 
+				Class const*						getNestedClassByName(char const*		name,
+																		 EAccessSpecifier	access = EAccessSpecifier::Undefined)		const	noexcept;
 
 			/**
-			*	@brief Retrieve from this struct a nested enum matching with a given predicate.
+			*	@brief Retrieve the first nested class satisfying the provided predicate.
 			*	
-			*	@param predicate Predicate returning true for any matching enum.
-			*	
-			*	@return The first matching enum if any is found, else nullptr.
+			*	@param predicate	Predicate defining a valid nested class.
+			*	@param userData		User data forwarded to the predicate calls.
+			* 
+			*	@return The first found nested class satisfying the predicate if any, else nullptr.
+			* 
+			*	@exception Any exception potentially thrown from the provided predicate.
 			*/
-			template <typename Predicate, typename = std::enable_if_t<std::is_invocable_r_v<bool, Predicate, Enum const*>>>
-			Enum const*							getNestedEnum(Predicate predicate)													const;
+			RFK_NODISCARD REFUREKU_API 
+				Class const*						getNestedClassByPredicate(Predicate<Class>	predicate,
+																			  void*				userData)								const;
+
+			/**
+			*	@brief Retrieve all nested classes satisfying the provided predicate.
+			*	
+			*	@param predicate	Predicate defining a valid nested class.
+			*	@param userData		User data forwarded to the predicate calls.
+			* 
+			*	@return All nested classes satisfying the predicate.
+			* 
+			*	@exception Any exception potentially thrown from the provided predicate.
+			*/
+			RFK_NODISCARD REFUREKU_API 
+				Vector<Class const*>				getNestedClassesByPredicate(Predicate<Class> predicate,
+																				void*			 userData)								const;
 
 			/**
 			*	@param enumName	Name of the nested enum to look for.
@@ -160,428 +195,631 @@ namespace rfk
 			*
 			*	@return The found nested class if any, else nullptr.
 			*/
-			Enum const*							getNestedEnum(std::string		enumName,
-															  EAccessSpecifier	access = EAccessSpecifier::Undefined)				const	noexcept;
+			RFK_NODISCARD REFUREKU_API 
+				Enum const*							getNestedEnumByName(char const*		 name,
+																		EAccessSpecifier access = EAccessSpecifier::Undefined)			const	noexcept;
 
 			/**
-			*	@brief Retrieve from this struct a field matching with a given predicate.
+			*	@brief Retrieve the first nested enum satisfying the provided predicate.
 			*	
-			*	@param predicate Predicate returning true for any matching field.
-			*	@param shouldInspectInherited Should inherited fields be considered as well in the search process?
-			*								  If false, only fields introduced by this struct will be considered.
-			*	
-			*	@return The first matching field if any is found, else nullptr.
+			*	@param predicate	Predicate defining a valid nested enum.
+			*	@param userData		User data forwarded to the predicate calls.
+			* 
+			*	@return The first found nested enum satisfying the predicate if any, else nullptr.
+			* 
+			*	@exception Any exception potentially thrown from the provided predicate.
 			*/
-			template <typename Predicate, typename = std::enable_if_t<std::is_invocable_r_v<bool, Predicate, Field const*>>>
-			Field const*						getField(Predicate	predicate,
-														 bool		shouldInspectInherited	= false)								const;
+			RFK_NODISCARD REFUREKU_API 
+				Enum const*							getNestedEnumByPredicate(Predicate<Enum>	predicate,
+																			 void*				userData)								const;
 
 			/**
-			*	@param fieldName Name of the field to retrieve.
-			*	@param minFlags Requirements the queried field should fulfill.
-			*					Keep in mind that the returned field should contain all of the specified flags,
-			*					so setting for example Public and Protected will always return nullptr.
-			*					EFieldFlags::Default means no requirement, so the first field named fieldName will be returned.
-			*	@param shouldInspectInherited Should inherited fields be considered as well in the search process?
-			*								  If false, only fields introduced by this struct will be considered.
+			*	@brief Retrieve all nested enums satisfying the provided predicate.
+			*	
+			*	@param predicate	Predicate defining a valid nested enum.
+			*	@param userData		User data forwarded to the predicate calls.
+			* 
+			*	@return All nested enums satisfying the predicate.
+			* 
+			*	@exception Any exception potentially thrown from the provided predicate.
+			*/
+			RFK_NODISCARD REFUREKU_API 
+				Vector<Enum const*>					getNestedEnumsByPredicate(Predicate<Enum>	predicate,
+																			  void*				userData)								const;
+
+			/**
+			*	@brief Execute the given visitor on all archetypes nested in this struct.
+			* 
+			*	@param visitor	Visitor function to call. Return false to abort the foreach loop.
+			*	@param userData	Optional user data forwarded to the visitor.
+			* 
+			*	@return	The last visitor result before exiting the loop.
+			*			If the visitor is nullptr, return false.
+			* 
+			*	@exception Any exception potentially thrown from the provided visitor.
+			*/
+			REFUREKU_API bool						foreachNestedArchetype(Visitor<Archetype>	visitor,
+																		   void*				userData)								const;
+
+			/**
+			*	@brief Get the number of archetypes nested in this struct.
+			* 
+			*	@return The number of archetypes nested in this struct.
+			*/
+			REFUREKU_API std::size_t				getNestedArchetypesCount()															const	noexcept;
+
+			/**
+			*	@param name						Name of the field to retrieve.
+			*	@param minFlags					Requirements the queried field should fulfill.
+			*										Keep in mind that the returned field should contain all of the specified flags,
+			*										so setting for example Public and Protected will always return nullptr.
+			*										EFieldFlags::Default means no requirement, so the first field named fieldName will be returned.
+			*	@param shouldInspectInherited	Should inherited fields be considered as well in the search process?
+			*										If false, only fields introduced by this struct will be considered.
 			*
 			*	@return The first field named fieldName fulfilling all requirements.
 			*			The method returns nullptr if none was found. 
 			*/
-			Field const*						getField(std::string	fieldName,
-														 EFieldFlags	minFlags				= EFieldFlags::Default,
-														 bool			shouldInspectInherited	= false)							const	noexcept;
+			RFK_NODISCARD REFUREKU_API 
+				Field const*						getFieldByName(char const* name,
+																   EFieldFlags minFlags = EFieldFlags::Default,
+																   bool		   shouldInspectInherited	= false)						const	noexcept;
 
 			/**
-			*	@brief Retrieve from this struct all the fields matching with a given predicate.
+			*	@brief Retrieve the first field satisfying the provided predicate.
 			*	
-			*	@param predicate Predicate returning true for any matching field.
-			*	@param shouldInspectInherited Should inherited fields be considered as well in the search process?
-			*								  If false, only fields introduced by this struct will be considered.
-			*	
-			*	@return A vector of all fields matching with the provided predicate.
+			*	@param predicate				Predicate defining a valid field.
+			*	@param userData					User data forwarded to the predicate calls.
+			*	@param shouldInspectInherited	Should inherited fields be considered as well in the search process?
+			*										If false, only fields introduced by this struct will be considered.
+			* 
+			*	@return The first found field satisfying the predicate if any, else nullptr.
+			* 
+			*	@exception Any exception potentially thrown from the provided predicate.
 			*/
-			template <typename Predicate, typename = std::enable_if_t<std::is_invocable_r_v<bool, Predicate, Field const*>>>
-			std::vector<Field const*>			getFields(Predicate	predicate,
-														  bool		shouldInspectInherited	= false)								const;
+			RFK_NODISCARD REFUREKU_API 
+				Field const*						getFieldByPredicate(Predicate<Field>	predicate,
+																		void*				userData,
+																		bool				shouldInspectInherited = false)				const;
 
 			/**
-			*	@param fieldName Name of the fields to retrieve.
-			*	@param minFlags Requirements the queried fields should fulfill.
-			*					Keep in mind that the returned fields should contain all of the specified flags,
-			*					so setting for example Public and Protected will always return an empty vector.
-			*					EFieldFlags::Default means no requirement, so all fields named fieldName will be returned.
-			*	@param shouldInspectInherited Should inherited fields be considered as well in the search process?
-			*								  If false, only fields introduced by this struct will be considered.
-			*
-			*	@return A vector of all fields named fieldName fulfilling all requirements.
-			*/
-			std::vector<Field const*>			getFields(std::string	fieldName,
-														 EFieldFlags	minFlags				= EFieldFlags::Default,
-														 bool			shouldInspectInherited	= false)							const	noexcept;
-
-			/**
-			*	@brief Retrieve from this struct a static field matching with a given predicate.
+			*	@brief Retrieve all fields satisfying the provided predicate.
 			*	
-			*	@param predicate Predicate returning true for any matching static field.
-			*	@param shouldInspectInherited Should inherited fields be considered as well in the search process?
-			*								  If false, only fields introduced by this struct will be considered.
-			*	
-			*	@return The first matching static field if any is found, else nullptr.
+			*	@param predicate				Predicate defining a valid field.
+			*	@param userData					User data forwarded to the predicate calls.
+			*	@param shouldInspectInherited	Should inherited fields be considered as well in the search process?
+			*										If false, only fields introduced by this struct will be considered.
+			* 
+			*	@return All fields satisfying the predicate.
+			* 
+			*	@exception Any exception potentially thrown from the provided predicate.
 			*/
-			template <typename Predicate, typename = std::enable_if_t<std::is_invocable_r_v<bool, Predicate, StaticField const*>>>
-			StaticField const*					getStaticField(Predicate	predicate,
-															   bool			shouldInspectInherited	= false)						const;
+			RFK_NODISCARD REFUREKU_API 
+				Vector<Field const*>				getFieldsByPredicate(Predicate<Field>	predicate,
+																		 void*				userData,
+																		 bool				shouldInspectInherited = false)				const;
 
 			/**
-			*	@param fieldName Name of the static field to retrieve.
-			*	@param minFlags Requirements the queried static field should fulfill.
-			*					Keep in mind that the returned static field should contain all of the specified flags,
-			*					so setting for example Public and Protected will always return nullptr.
-			*					EFieldFlags::Default means no requirement, so the first static field named fieldName will be returned.
-			*					Note: It doesn't matter whether you set the Static flag or not as this method is designed to return static fields only.
-			*	@param shouldInspectInherited Should inherited static fields be considered as well in the search process?
-			*								  If false, only static fields introduced by this struct will be considered.
+			*	@brief Execute the given visitor on all fields in this struct.
+			* 
+			*	@param visitor					Visitor function to call. Return false to abort the foreach loop.
+			*	@param userData					Optional user data forwarded to the visitor.
+			*	@param shouldInspectInherited	Should inherited fields be considered as well in the search process?
+			*										If false, only fields introduced by this struct will be considered.
+			* 
+			*	@return	The last visitor result before exiting the loop.
+			*			If the visitor is nullptr, return false.
+			* 
+			*	@exception Any exception potentially thrown from the provided visitor.
+			*/
+			REFUREKU_API bool						foreachField(Visitor<Field>	visitor,
+																 void*			userData,
+																 bool			shouldInspectInherited = false)							const;
+
+			/**
+			*	@brief Get the number of fields (including inherited ones) in this struct.
+			* 
+			*	@return The number of fields in this struct.
+			*/
+			REFUREKU_API std::size_t				getFieldsCount()																	const	noexcept;
+
+			/**
+			*	@param name						Name of the static field to retrieve.
+			*	@param minFlags					Requirements the queried static field should fulfill.
+			*										Keep in mind that the returned static field should contain all of the specified flags,
+			*										so setting for example Public and Protected will always return nullptr.
+			*										EFieldFlags::Default means no requirement, so the first static field named fieldName will be returned.
+			*										Note: It doesn't matter whether you set the Static flag or not as this method is designed to return static fields only.
+			*	@param shouldInspectInherited	Should inherited static fields be considered as well in the search process?
+			*										If false, only static fields introduced by this struct will be considered.
 			*
 			*	@return The first static field named fieldName fulfilling all requirements.
 			*			The method returns nullptr if none was found. 
 			*/
-			StaticField const*					getStaticField(std::string	fieldName,
-															   EFieldFlags	minFlags				= EFieldFlags::Default,
-															   bool			shouldInspectInherited	= false)						const	noexcept;
+			RFK_NODISCARD REFUREKU_API 
+				StaticField const*					getStaticFieldByName(char const* name,
+																		 EFieldFlags minFlags = EFieldFlags::Default,
+																		 bool		 shouldInspectInherited	= false)					const	noexcept;
 
 			/**
-			*	@brief Retrieve from this struct all static fields matching with a given predicate.
+			*	@brief Retrieve the first static field satisfying the provided predicate.
 			*	
-			*	@param predicate Predicate returning true for any matching static field.
-			*	@param shouldInspectInherited Should inherited fields be considered as well in the search process?
-			*								  If false, only fields introduced by this struct will be considered.
-			*	
-			*	@return A vector of all static fields matching with the provided predicate.
+			*	@param predicate				Predicate defining a valid static field.
+			*	@param userData					User data forwarded to the predicate calls.
+			*	@param shouldInspectInherited	Should inherited static fields be considered as well in the search process?
+			*										If false, only static fields introduced by this struct will be considered.
+			* 
+			*	@return The first found static field satisfying the predicate if any, else nullptr.
+			* 
+			*	@exception Any exception potentially thrown from the provided predicate.
 			*/
-			template <typename Predicate, typename = std::enable_if_t<std::is_invocable_r_v<bool, Predicate, StaticField const*>>>
-			std::vector<StaticField const*>		getStaticFields(Predicate	predicate,
-																bool		shouldInspectInherited	= false)						const;
+			RFK_NODISCARD REFUREKU_API 
+				StaticField const*					getStaticFieldByPredicate(Predicate<StaticField> predicate,
+																			  void*					 userData,
+																			  bool					 shouldInspectInherited	= false)	const;
 
 			/**
-			*	@param fieldName Name of the static fields to retrieve.
-			*	@param minFlags Requirements the queried static fields should fulfill.
-			*					Keep in mind that the returned static fields should contain all of the specified flags,
-			*					so setting for example Public and Protected will always return an empty vector.
-			*					EFieldFlags::Default means no requirement, so all static fields named fieldName will be returned.
-			*					Note: It doesn't matter whether you set the Static flag or not as this method is designed to return static fields only.
-			*	@param shouldInspectInherited Should inherited static fields be considered as well in the search process?
-			*								  If false, only static fields introduced by this struct will be considered.
-			*
-			*	@return A vector of all static fields named fieldName fulfilling all requirements.
-			*/
-			std::vector<StaticField const*>		getStaticFields(std::string	fieldName,
-															   EFieldFlags	minFlags				= EFieldFlags::Default,
-															   bool			shouldInspectInherited	= false)						const	noexcept;
-
-			/**
-			*	@brief Retrieve from this struct a method matching with a given predicate.
+			*	@brief Retrieve all static fields satisfying the provided predicate.
 			*	
-			*	@param predicate				Predicate returning true for any matching method.
+			*	@param predicate				Predicate defining a valid static field.
+			*	@param userData					User data forwarded to the predicate calls.
+			*	@param shouldInspectInherited	Should inherited static fields be considered as well in the search process?
+			*										If false, only static fields introduced by this struct will be considered.
+			* 
+			*	@return All static fields satisfying the predicate.
+			* 
+			*	@exception Any exception potentially thrown from the provided predicate.
+			*/
+			RFK_NODISCARD REFUREKU_API 
+				Vector<StaticField const*>			getStaticFieldsByPredicate(Predicate<StaticField>	predicate,
+																			   void*					userData,
+																			   bool						shouldInspectInherited = false)	const;
+
+			/**
+			*	@brief Execute the given visitor on all static fields in this struct.
+			* 
+			*	@param visitor					Visitor function to call. Return false to abort the foreach loop.
+			*	@param userData					Optional user data forwarded to the visitor.
+			*	@param shouldInspectInherited	Should inherited static fields be considered as well in the search process?
+			*										If false, only fields introduced by this struct will be considered.
+			* 
+			*	@return	The last visitor result before exiting the loop.
+			*			If the visitor is nullptr, return false.
+			* 
+			*	@exception Any exception potentially thrown from the provided visitor.
+			*/
+			REFUREKU_API bool						foreachStaticField(Visitor<StaticField>	visitor,
+																	   void*				userData,
+																	   bool					shouldInspectInherited	= false)			const;
+
+			/**
+			*	@brief Get the number of static fields (including inherited ones) in this struct.
+			* 
+			*	@return The number of static fields in this struct.
+			*/
+			REFUREKU_API std::size_t				getStaticFieldsCount()																const	noexcept;
+
+			/**
+			*	@brief	Get a method by name and signature. This template overload using signature comes handy when wanting to disambiguate
+			*			2 method overloads with and without const qualifier for example.
+			* 
+			*	@param name						Name of the method to retrieve.
+			*	@param minFlags					Requirements the queried method should fulfill.
+			*										Keep in mind that the returned method should contain all of the specified flags,
+			*										so setting for example Public and Protected will always return nullptr.
+			*										EMethodFlags::Default means no requirement, so the first method named methodName will be returned.
 			*	@param shouldInspectInherited	Should inherited methods be considered as well in the search process?
-			*									If false, only methods introduced by this struct will be considered.
-			*	
-			*	@return The first matching method if any is found, else nullptr.
-			*/
-			template <typename Predicate, typename = std::enable_if_t<std::is_invocable_r_v<bool, Predicate, Method const*>>>
-			Method const*						getMethod(Predicate predicate,
-														  bool		shouldInspectInherited = false)									const;
-
-			/**
-			*	@tparam MethodSignature Signature (prototype) of the method to look for.
-			*			Example1: void example1Method(int i, float j);	-> getMethod<void(int, float)>("example1Method");
-			*			Example2: int  example2Method() const;			-> getMethod<int()>("example2Method");
-			*
-			*	@param methodName Name of the method to retrieve.
-			*	@param minFlags Requirements the queried method should fulfill.
-			*					Keep in mind that the returned method should contain all of the specified flags,
-			*					so setting for example Public and Protected will always return nullptr.
-			*					EMethodFlags::Default means no requirement, so the first method named methodName will be returned.
-			*	@param shouldInspectInherited Should inherited methods be considered as well in the search process?
-			*								  If false, only methods introduced by this struct will be considered.
+			*										If false, only methods introduced by this struct will be considered.
 			*
 			*	@return The first method named methodName fulfilling all requirements, nullptr if none was found. 
 			*/
 			template <typename MethodSignature>
-			Method const*						getMethod(std::string const&	methodName,
-														  EMethodFlags			minFlags				= EMethodFlags::Default,
-														  bool					shouldInspectParents	= false)					const	noexcept;
+			RFK_NODISCARD Method const*				getMethodByName(char const*  name,
+																	EMethodFlags minFlags = EMethodFlags::Default,
+																	bool		 shouldInspectInherited	= false)						const	noexcept;
 
 			/**
-			*	@param methodName Name of the method to retrieve.
-			*	@param minFlags Requirements the queried method should fulfill.
-			*					Keep in mind that the returned method should contain all of the specified flags,
-			*					so setting for example Public and Protected will always return nullptr.
-			*					EMethodFlags::Default means no requirement, so the first method named methodName will be returned.
-			*	@param shouldInspectInherited Should inherited methods be considered as well in the search process?
-			*								  If false, only methods introduced by this struct will be considered.
+			*	@param name						Name of the method to retrieve.
+			*	@param minFlags					Requirements the queried method should fulfill.
+			*										Keep in mind that the returned method should contain all of the specified flags,
+			*										so setting for example Public and Protected will always return nullptr.
+			*										EMethodFlags::Default means no requirement, so the first method named methodName will be returned.
+			*	@param shouldInspectInherited	Should inherited methods be considered as well in the search process?
+			*										If false, only methods introduced by this struct will be considered.
 			*
 			*	@return The first method named methodName fulfilling all requirements, nullptr if none was found. 
 			*/
-			Method const*						getMethod(std::string const&	methodName,
-														  EMethodFlags			minFlags				= EMethodFlags::Default,
-														  bool					shouldInspectInherited	= false)					const	noexcept;
+			RFK_NODISCARD REFUREKU_API
+				Method const*						getMethodByName(char const*  name,
+																	EMethodFlags minFlags = EMethodFlags::Default,
+																	bool		 shouldInspectInherited	= false)						const	noexcept;
 
 			/**
-			*	@brief Retrieve from a struct all methods matching with a given predicate.
-			*	
-			*	@param predicate				Predicate defining the matching method.
+			*	@param name						Name of the methods to retrieve.
+			*	@param minFlags					Requirements the queried methods should fulfill.
+			*										Keep in mind that the returned methods should contain all of the specified flags,
+			*										so setting for example Public and Protected will always return an empty vector.
+			*										EMethodFlags::Default means no requirement, so all methods named methodName will be returned.
 			*	@param shouldInspectInherited	Should inherited methods be considered as well in the search process?
-			*									If false, only methods introduced by this struct will be considered.
-			*	
-			*	@return The first method matching with the predicate, nullptr if none was found. 
-			*/
-			template <typename Predicate, typename = std::enable_if_t<std::is_invocable_r_v<bool, Predicate, Method const*>>>
-			std::vector<Method const*>			getMethods(Predicate	predicate,
-														   bool			shouldInspectInherited = false)								const;
-
-			/**
-			*	@param methodName Name of the methods to retrieve.
-			*	@param minFlags Requirements the queried methods should fulfill.
-			*					Keep in mind that the returned methods should contain all of the specified flags,
-			*					so setting for example Public and Protected will always return an empty vector.
-			*					EMethodFlags::Default means no requirement, so all methods named methodName will be returned.
-			*	@param shouldInspectInherited Should inherited methods be considered as well in the search process?
-			*								  If false, only methods introduced by this struct will be considered.
+			*										If false, only methods introduced by this struct will be considered.
 			*
 			*	@return A vector of all methods named methodName fulfilling all requirements. 
 			*/
-			std::vector<Method const*>			getMethods(std::string const&	methodName,
-														   EMethodFlags			minFlags				= EMethodFlags::Default,
-														   bool					shouldInspectInherited	= false)					const	noexcept;
+			RFK_NODISCARD REFUREKU_API 
+				Vector<Method const*>				getMethodsByName(char const*  name,
+																	 EMethodFlags minFlags = EMethodFlags::Default,
+																	 bool		  shouldInspectInherited = false)						const	noexcept;
 
 			/**
-			*	@brief Retrieve from this struct a static method matching with a given predicate.
+			*	@brief Retrieve the first method satisfying the provided predicate.
 			*	
-			*	@param predicate				Predicate returning true for any matching static method.
-			*	@param shouldInspectInherited	Should inherited static methods be considered as well in the search process?
-			*									If false, only static methods introduced by this struct will be considered.
-			*	
-			*	@return The first matching static method if any is found, else nullptr.
+			*	@param predicate				Predicate defining a valid method.
+			*	@param userData					User data forwarded to the predicate calls.
+			*	@param shouldInspectInherited	Should inherited methods be considered as well in the search process?
+			*										If false, only methods introduced by this struct will be considered.
+			* 
+			*	@return The first found method satisfying the predicate if any, else nullptr.
+			* 
+			*	@exception Any exception potentially thrown from the provided predicate.
 			*/
-			template <typename Predicate, typename = std::enable_if_t<std::is_invocable_r_v<bool, Predicate, StaticMethod const*>>>
-			StaticMethod const*					getStaticMethod(Predicate	predicate,
-																bool		shouldInspectInherited = false)							const;
+			RFK_NODISCARD REFUREKU_API
+				Method const*						getMethodByPredicate(Predicate<Method>	predicate,
+																		 void*				userData,
+																		 bool				shouldInspectInherited = false)				const;
 
 			/**
-			*	@tparam MethodSignature Signature (prototype) of the static method to look for.
-			*			Example1: static void example1Method(int i, float j);	-> getStaticMethod<void(int, float)>("example1Method");
-			*			Example2: static int  example2Method() const;			-> getStaticMethod<int()>("example2Method");
-			*
-			*	@param methodName Name of the static method to retrieve.
-			*	@param minFlags Requirements the queried static method should fulfill.
-			*					Keep in mind that the returned static method should contain all of the specified flags,
-			*					so setting for example Public and Protected will always return nullptr.
-			*					EMethodFlags::Default means no requirement, so the first static method named methodName will be returned.
-			*					Note: It doesn't matter whether you set the Static flag or not as this method is designed to return static methods only.
-			*	@param shouldInspectInherited Should inherited static methods be considered as well in the search process?
-			*								  If false, only static methods introduced by this struct will be considered.
+			*	@brief Retrieve all methods satisfying the provided predicate.
+			*	
+			*	@param predicate				Predicate defining a valid method.
+			*	@param userData					User data forwarded to the predicate calls.
+			*	@param shouldInspectInherited	Should inherited methods be considered as well in the search process?
+			*										If false, only methods introduced by this struct will be considered.
+			* 
+			*	@return All methods satisfying the predicate.
+			* 
+			*	@exception Any exception potentially thrown from the provided predicate.
+			*/
+			RFK_NODISCARD REFUREKU_API 
+				Vector<Method const*>				getMethodsByPredicate(Predicate<Method> predicate,
+																		  void*				userData,
+																		  bool				shouldInspectInherited = false)				const;
+
+			/**
+			*	@brief Execute the given visitor on all methods in this struct.
+			* 
+			*	@param visitor					Visitor function to call. Return false to abort the foreach loop.
+			*	@param userData					Optional user data forwarded to the visitor.
+			*	@param shouldInspectInherited	Should iterate on inherited methods as well?
+			* 
+			*	@return	The last visitor result before exiting the loop.
+			*			If the visitor is nullptr, return false.
+			* 
+			*	@exception Any exception potentially thrown from the provided visitor.
+			*/
+			REFUREKU_API bool						foreachMethod(Visitor<Method>	visitor,
+																  void*				userData,
+																  bool				shouldInspectInherited = false)						const;
+
+			/**
+			*	@brief Get the number of methods (excluding inherited ones) in this struct.
+			* 
+			*	@return The number of methods in this struct.
+			*/
+			REFUREKU_API std::size_t				getMethodsCount()																	const	noexcept;
+
+			/**
+			*	@param name						Name of the static method to retrieve.
+			*	@param minFlags					Requirements the queried static method should fulfill.
+			*										Keep in mind that the returned static method should contain all of the specified flags,
+			*										so setting for example Public and Protected will always return nullptr.
+			*										EMethodFlags::Default means no requirement, so the first static method named methodName will be returned.
+			*										Note: It doesn't matter whether you set the Static flag or not as this method is designed to return static methods only.
+			*	@param shouldInspectInherited	Should inherited static methods be considered as well in the search process?
+			*										If false, only static methods introduced by this struct will be considered.
 			*
 			*	@return The first static method named methodName fulfilling all requirements, nullptr if none was found. 
 			*/
-			template <typename MethodSignature>
-			StaticMethod const*					getStaticMethod(std::string const&	methodName,
-																EMethodFlags		minFlags				= EMethodFlags::Default,
-																bool				shouldInspectInherited	= false)				const	noexcept;
+			template <typename StaticMethodSignature>
+			RFK_NODISCARD StaticMethod const*		getStaticMethodByName(char const*  name,
+																		  EMethodFlags minFlags = EMethodFlags::Default,
+																		  bool		   shouldInspectInherited = false)					const	noexcept;
 
 			/**
-			*	@param methodName Name of the static method to retrieve.
-			*	@param minFlags Requirements the queried static method should fulfill.
-			*					Keep in mind that the returned static method should contain all of the specified flags,
-			*					so setting for example Public and Protected will always return nullptr.
-			*					EMethodFlags::Default means no requirement, so the first static method named methodName will be returned.
-			*					Note: It doesn't matter whether you set the Static flag or not as this method is designed to return static methods only.
-			*	@param shouldInspectInherited Should inherited static methods be considered as well in the search process?
-			*								  If false, only static methods introduced by this struct will be considered.
+			*	@param name						Name of the static method to retrieve.
+			*	@param minFlags					Requirements the queried static method should fulfill.
+			*										Keep in mind that the returned static method should contain all of the specified flags,
+			*										so setting for example Public and Protected will always return nullptr.
+			*										EMethodFlags::Default means no requirement, so the first static method named methodName will be returned.
+			*										Note: It doesn't matter whether you set the Static flag or not as this method is designed to return static methods only.
+			*	@param shouldInspectInherited	Should inherited static methods be considered as well in the search process?
+			*										If false, only static methods introduced by this struct will be considered.
 			*
 			*	@return The first static method named methodName fulfilling all requirements, nullptr if none was found. 
 			*/
-			StaticMethod const*					getStaticMethod(std::string const&	methodName,
-																EMethodFlags		minFlags				= EMethodFlags::Default,
-																bool				shouldInspectInherited	= false)				const	noexcept;
+			RFK_NODISCARD REFUREKU_API 
+				StaticMethod const*					getStaticMethodByName(char const*  name,
+																		  EMethodFlags minFlags = EMethodFlags::Default,
+																		  bool		   shouldInspectInherited = false)					const	noexcept;
 
 			/**
-			*	@brief Retrieve from this struct all static methods matching with a given predicate.
-			*	
-			*	@param predicate				Predicate returning true for any matching static method.
+			*	@param methodName				Name of the static methods to retrieve.
+			*	@param minFlags					Requirements the queried static methods should fulfill.
+			*										Keep in mind that the returned static methods should contain all of the specified flags,
+			*										so setting for example Public and Protected will always return an empty vector.
+			*										EMethodFlags::Default means no requirement, so all static methods named methodName will be returned.
+			*										Note: It doesn't matter whether you set the Static flag or not as this method is designed to return static methods only.
 			*	@param shouldInspectInherited	Should inherited static methods be considered as well in the search process?
-			*									If false, only static methods introduced by this struct will be considered.
-			*	
-			*	@return All static methods matching with the given predicate.
-			*/
-			template <typename Predicate, typename = std::enable_if_t<std::is_invocable_r_v<bool, Predicate, StaticMethod const*>>>
-			std::vector<StaticMethod const*>	getStaticMethods(Predicate	predicate,
-																 bool		shouldInspectInherited = false)							const;
-
-			/**
-			*	@param methodName Name of the static methods to retrieve.
-			*	@param minFlags Requirements the queried static methods should fulfill.
-			*					Keep in mind that the returned static methods should contain all of the specified flags,
-			*					so setting for example Public and Protected will always return an empty vector.
-			*					EMethodFlags::Default means no requirement, so all static methods named methodName will be returned.
-			*					Note: It doesn't matter whether you set the Static flag or not as this method is designed to return static methods only.
-			*	@param shouldInspectInherited Should inherited static methods be considered as well in the search process?
-			*								  If false, only static methods introduced by this struct will be considered.
+			*										If false, only static methods introduced by this struct will be considered.
 			*
 			*	@return All static methods named methodName fulfilling all requirements. 
 			*/
-			std::vector<StaticMethod const*>	getStaticMethods(std::string const&	methodName,
-																 EMethodFlags		minFlags				= EMethodFlags::Default,
-																 bool				shouldInspectInherited	= false)				const	noexcept;
+			RFK_NODISCARD REFUREKU_API
+				Vector<StaticMethod const*>			getStaticMethodsByName(char const*  name,
+																		   EMethodFlags minFlags = EMethodFlags::Default,
+																		   bool			shouldInspectInherited = false)					const	noexcept;
 
 			/**
-			*	@brief Make an instance of the class represented by this archetype.
-			*
-			*	If no argument is specified, the default constructor will be used.
-			*	In case the class isn't default constructible, the matching user-specified custom instantiator will be used.
-			*	If one or more arguments are provided, the matching user-specified custom instantiator will be used.
+			*	@brief Retrieve the first static method satisfying the provided predicate.
 			*	
-			*	For more information about custom instantiators, see https://github.com/jsoysouvanh/Refureku/wiki/Properties#custominstantiator-method.
-			*
-			*	@note Memory is not auto-managed and must be freed manually by the user.
-			*
-			*	@return an instance of this struct if a suitable constructor (no params only) / custom instantator was found,
-			*			else nullptr.
+			*	@param predicate				Predicate defining a valid static method.
+			*	@param userData					User data forwarded to the predicate calls.
+			*	@param shouldInspectInherited	Should inherited static methods be considered as well in the search process?
+			*										If false, only static methods introduced by this struct will be considered.
+			* 
+			*	@return The first found static method satisfying the predicate if any, else nullptr.
+			* 
+			*	@exception Any exception potentially thrown from the provided predicate.
 			*/
-			template <typename ReturnType = void, typename... ArgTypes>
-			ReturnType*	makeInstance(ArgTypes&&... args)						const;
+			RFK_NODISCARD REFUREKU_API
+				StaticMethod const*					getStaticMethodByPredicate(Predicate<StaticMethod>	predicate,
+																			   void*					userData,
+																			   bool						shouldInspectInherited = false)	const;
 
 			/**
-			*	@return true if this type is a subclass from the provided type, else false.
+			*	@brief Retrieve all static methods satisfying the provided predicate.
+			*	
+			*	@param predicate				Predicate defining a valid static method.
+			*	@param userData					User data forwarded to the predicate calls.
+			*	@param shouldInspectInherited	Should inherited static methods be considered as well in the search process?
+			*										If false, only static methods introduced by this struct will be considered.
+			* 
+			*	@return All static methods satisfying the predicate.
+			* 
+			*	@exception Any exception potentially thrown from the provided predicate.
 			*/
-			bool		isSubclassOf(Struct const& otherType)					const	noexcept;
-			
-			/**
-			*	@return true if this type is a parent (direct or not) of the provided type, else false.
-			*/
-			bool		isBaseOf(Struct const& otherType)						const	noexcept;
+			RFK_NODISCARD REFUREKU_API 
+				Vector<StaticMethod const*>			getStaticMethodsByPredicate(Predicate<StaticMethod> predicate,
+																				void*					userData,
+																				bool					shouldInspectInherited = false)	const;
 
 			/**
-			*	@brief Add the type T to this type's parents if T is a reflected class.
+			*	@brief Execute the given visitor on all static methods in this struct.
+			* 
+			*	@param visitor					Visitor function to call. Return false to abort the foreach loop.
+			*	@param userData					Optional user data forwarded to the visitor.
+			*	@param shouldInspectInherited	Should iterate on inherited static methods as well?
+			* 
+			*	@return	The last visitor result before exiting the loop.
+			*			If the visitor is nullptr, return false.
+			* 
+			*	@exception Any exception potentially thrown from the provided visitor.
 			*/
-			template <typename T>
-			void		addToParents(EAccessSpecifier inheritanceAccess)				noexcept;
+			REFUREKU_API bool						foreachStaticMethod(Visitor<StaticMethod>	visitor,
+																		void*					userData,
+																		bool					shouldInspectInherited = false)			const;
 
 			/**
-			*	@brief	Add a new way to instantiate this struct through the makeInstance method.
-			*			If the provided static method takes no parameter, it will override the default instantiator.
-			*	
-			*	@param instantiator Pointer to the static method.
+			*	@brief Get the number of static methods (excluding inherited ones) in this struct.
+			* 
+			*	@return The number of static methods in this struct.
 			*/
-			template <typename ReturnType>
-			void		addCustomInstantiator(StaticMethod const* instantiator)			noexcept;
-			
-			/**
-			*	@brief	Setup the default instantiator to use when a Struct::makeInstance is called without parameters.
-			*			If a call to Struct::addCustomInstantiator is made with a static method taking no parameter, the previously set default instantiator will be overriden.
-			*
-			*	@param defaultInstantiator Pointer to the instantiator method.
-			*/
-			void		setDefaultInstantiator(void*(*defaultInstantiator)())			noexcept;
+			REFUREKU_API std::size_t				getStaticMethodsCount()																const	noexcept;
 
 			/**
-			*	@brief Add a field to the struct.
-			*	
-			*	@param fieldName	Name of the field.
-			*	@param entityId		Unique entity if of the field.
-			*	@param type			Type of the field.
-			*	@param flags		Field flags.
-			*	@param outerEntity_	Struct the field was first declared in (in case of inherited field, outerEntity is the parent struct).
-			*	@param memoryOffset	Offset in bytes of the field in the struct (obtained from offsetof).
-			*	
-			*	@return A pointer to the added field. The pointer is made from the iterator, so is unvalidated as soon as the iterator is unvalidated.
-			*			The name of the field **MUST NOT** be changed to avoid breaking the hash value, thus the whole underlying container.
+			*	@brief Get the class kind of this instance.
+			* 
+			*	@return The class kind of this instance.
 			*/
-			Field*			addField(std::string	fieldName,
-									 uint64			entityId,
-									 Type const&	type,
-									 EFieldFlags	flags,
-									 Struct const*	outerEntity_,
-									 uint64			memoryOffset)						noexcept;
+			RFK_NODISCARD REFUREKU_API EClassKind	getClassKind()																		const	noexcept;
 
 			/**
-			*	@brief Add a static field to the struct.
-			*	
-			*	@param fieldName	Name of the static field.
-			*	@param entityId		Unique entity if of the static field.
-			*	@param type			Type of the static field.
-			*	@param flags		Field flags.
-			*	@param outerEntity_	Struct the field was first declared in (in case of inherited field, outerEntity is the parent struct).
-			*	@param fieldPtr		Pointer to the static field memory.
-			*	
-			*	@return A pointer to the added static field. The pointer is made from the iterator, so is unvalidated as soon as the iterator is unvalidated.
-			*			The name of the static field **MUST NOT** be changed to avoid breaking the hash value, thus the whole underlying container.
+			*	@brief Add a parent to this struct if the provided archetype is a valid struct/class.
+			* 
+			*	@param archetype			Archetype of the parent struct/class.
+			*	@param inheritanceAccess	The inheritance access for the provided parent.
 			*/
-			StaticField*	addStaticField(std::string		fieldName,
-										   uint64			entityId,
-										   Type const&		type,
-										   EFieldFlags		flags,
-										   Struct const*	outerEntity_,
-										   void*			fieldPtr)					noexcept;
+			REFUREKU_API void						addDirectParent(Archetype const*	archetype,
+																	EAccessSpecifier	inheritanceAccess)										noexcept;
 
 			/**
-			*	@brief Add a method to the struct.
-			*	
-			*	@param methodName		Name of the method.
-			*	@param entityId			Unique entity id of the method.
-			*	@param returnType		Return type of the method call.
-			*	@param internalMethod	Pointer to the actual method.
-			*	@param flags			Method flags.
-			*
-			*	@return A pointer to the added method. The pointer is made from the iterator, so is unvalidated as soon as the iterator is unvalidated.
-			*			The name of the method **MUST NOT** be changed to avoid breaking the hash value, thus the whole underlying container.
+			*	@brief	Set the number of direct parents for this struct.
+			*			Useful to avoid reallocations and avoid having unused memory.
+			*			If the number of direct parents is already >= to the provided count, this method has no effect.
+			* 
+			*	@param capacity The number of direct parents of this struct.
 			*/
-			Method*			addMethod(std::string					methodName,
-									  uint64						entityId,
-									  Type const&					returnType,
-									  std::unique_ptr<ICallable>	internalMethod,
-									  EMethodFlags					flags)				noexcept;
+			REFUREKU_API void						setDirectParentsCapacity(std::size_t capacity)												noexcept;
 
 			/**
-			*	@brief Add a static method to the struct.
-			*	
-			*	@param methodName		Name of the static method.
-			*	@param entityId			Unique entity id of the static method.
-			*	@param returnType		Return type of the static method call.
-			*	@param internalMethod	Pointer to the actual static method.
-			*	@param flags			Method flags.
-			*
-			*	@return A pointer to the added static method. The pointer is made from the iterator, so is unvalidated as soon as the iterator is unvalidated.
-			*			The name of the static method **MUST NOT** be changed to avoid breaking the hash value, thus the whole underlying container.
+			*	@brief Add a subclass to this struct.
+			* 
+			*	@param subclass The subclass to add.
 			*/
-			StaticMethod*	addStaticMethod(std::string					methodName,
-											uint64						entityId,
-											Type const&					returnType,
-											std::unique_ptr<ICallable>	internalMethod,
-											EMethodFlags				flags)			noexcept;
+			REFUREKU_API void						addSubclass(Struct const& subclass)															noexcept;
 
 			/**
 			*	@brief Add a nested archetype to the struct.
 			*	
 			*	@param nestedArchetype	Nested archetype.
-			*	@param accessSpeficier_	Access of the nested archetype in the struct.
+			*	@param accessSpeficier	Access specifier of the nested archetype in the struct.
 			*	
 			*	@param A pointer to the added archetype. The pointer is made from the iterator, so is unvalidated as soon as the iterator is unvalidated.
-			*			The name of the archetype **MUST NOT** be changed to avoid breaking the hash value, thus the whole underlying container.
 			*/
-			Archetype*		addNestedArchetype(Archetype const* nestedArchetype,
-											   EAccessSpecifier	accessSpecifier_)		noexcept;
+			REFUREKU_API Archetype*					addNestedArchetype(Archetype const*	nestedArchetype,
+																	   EAccessSpecifier	accessSpecifier)										noexcept;
+
+			/**
+			*	@brief	Internally pre-allocate enough memory for the provided number of nested archetypes.
+			*			If the number of nested archetypes is already >= to the provided capacity, this method has no effect.
+			* 
+			*	@param capacity The number of nested archetypes to pre-allocate.
+			*/
+			REFUREKU_API void						setNestedArchetypesCapacity(std::size_t capacity)											noexcept;
+
+			/**
+			*	@brief Add a field to the struct.
+			*	
+			*	@param name			Name of the field.
+			*	@param id			Unique entity id of the field.
+			*	@param type			Type of the field.
+			*	@param flags		Field flags.
+			*	@param memoryOffset	Offset in bytes of the field in the owner struct (obtained from offsetof).
+			*	@param outerEntity	Struct the field was first declared in (in case of inherited field, outerEntity is the parent struct).
+			*	
+			*	@return A pointer to the added field.
+			*			The pointer is made from the iterator, so is unvalidated as soon as the iterator is unvalidated.
+			*/
+			REFUREKU_API Field*						addField(char const*	name,
+															 std::size_t	id,
+															 Type const&	type,
+															 EFieldFlags	flags,
+															 std::size_t	memoryOffset,
+															 Struct const*	outerEntity)														noexcept;
+
+			/**
+			*	@brief	Internally pre-allocate enough memory for the provided number of fields.
+			*			If the number of fields is already >= to the provided capacity, this method has no effect.
+			* 
+			*	@param capacity The number of fields to pre-allocate.
+			*/
+			REFUREKU_API void						setFieldsCapacity(std::size_t capacity)														noexcept;
+				
+			/**
+			*	@brief Add a static field to the struct.
+			*	
+			*	@param name			Name of the static field.
+			*	@param id			Unique entity id of the static field.
+			*	@param type			Type of the static field.
+			*	@param flags		Field flags.
+			*	@param fieldPtr		Pointer to the static field.
+			*	@param outerEntity	Struct the field was first declared in (in case of inherited field, outerEntity is the parent struct).
+			*	
+			*	@return A pointer to the added static field.
+			*			The pointer is made from the iterator, so is unvalidated as soon as the iterator is unvalidated.
+			*/
+			REFUREKU_API StaticField*				addStaticField(char const*		name,
+																   std::size_t		id,
+																   Type const&		type,
+																   EFieldFlags		flags,
+																   void*			fieldPtr,
+																   Struct const*	outerEntity)												noexcept;
+			REFUREKU_API StaticField*				addStaticField(char const*		name,
+																   std::size_t		id,
+																   Type const&		type,
+																   EFieldFlags		flags,
+																   void const*		fieldPtr,
+																   Struct const*	outerEntity)												noexcept;
+
+			/**
+			*	@brief	Internally pre-allocate enough memory for the provided number of static fields.
+			*			If the number of static fields is already >= to the provided capacity, this method has no effect.
+			* 
+			*	@param capacity The number of static fields to pre-allocate.
+			*/
+			REFUREKU_API void						setStaticFieldsCapacity(std::size_t capacity)												noexcept;
+
+			/**
+			*	@brief Add a method to the struct.
+			*	
+			*	@param name				Name of the method.
+			*	@param id				Unique entity id of the method.
+			*	@param returnType		Return type of the method call.
+			*	@param internalMethod	Dynamically allocated MemberFunction storing the underlying method.
+			*	@param flags			Method flags.
+			*
+			*	@return A pointer to the added method. The pointer is made from the iterator, so is unvalidated as soon as the iterator is unvalidated.
+			*/
+			REFUREKU_API Method*					addMethod(char const*	name,
+															  std::size_t	id,
+															  Type const&	returnType,
+															  ICallable*	internalMethod,
+															  EMethodFlags	flags)																noexcept;
+
+			/**
+			*	@brief	Internally pre-allocate enough memory for the provided number of methods.
+			*			If the number of methods is already >= to the provided capacity, this method has no effect.
+			* 
+			*	@param capacity The number of methods to pre-allocate.
+			*/
+			REFUREKU_API void						setMethodsCapacity(std::size_t capacity)													noexcept;
+
+			/**
+			*	@brief Add a static method to the struct.
+			*	
+			*	@param methodName		Name of the static method.
+			*	@param id				Unique entity id of the static method.
+			*	@param returnType		Return type of the static method call.
+			*	@param internalMethod	Dynamically allocated NonMemberFunction storing the underlying static method.
+			*	@param flags			Method flags.
+			*
+			*	@return A pointer to the added static method. The pointer is made from the iterator, so is unvalidated as soon as the iterator is unvalidated.
+			*/
+			REFUREKU_API StaticMethod*				addStaticMethod(char const*		name,
+																	std::size_t		id,
+																	Type const&		returnType,
+																	ICallable*		internalMethod,
+																	EMethodFlags	flags)														noexcept;
+
+			/**
+			*	@brief	Internally pre-allocate enough memory for the provided number of static methods.
+			*			If the number of static methods is already >= to the provided capacity, this method has no effect.
+			* 
+			*	@param capacity The number of static methods to pre-allocate.
+			*/
+			REFUREKU_API void						setStaticMethodsCapacity(std::size_t capacity)												noexcept;
+
+			/**
+			*	@brief	Add a new way to instantiate this struct through the makeSharedInstance method.
+			*			The passed static method MUST return a rfk::SharedPtr<StructType>. Otherwise, the behaviour is undefined
+			*			when calling Struct::makeSharedInstance.
+			*	
+			*	@param instantiator Pointer to the static method.
+			*/
+			REFUREKU_API void						addSharedInstantiator(StaticMethod const& instantiator)										noexcept;
+
+		protected:
+			//Forward declaration
+			class StructImpl;
+
+			REFUREKU_INTERNAL Struct(char const*	name,
+									 std::size_t	id,
+									 std::size_t	memorySize,
+									 bool			isClass,
+									 EClassKind		classKind)		noexcept;
+			REFUREKU_INTERNAL Struct(StructImpl* implementation)	noexcept;
+
+			RFK_GEN_GET_PIMPL(StructImpl, Entity::getPimpl())
+
+		private:
+			/**
+			*	@brief Execute the given visitor on all instantiators taking a given number of parameters in this struct.
+			* 
+			*	@param argCount	Number of arguments the instantiator takes.
+			*	@param visitor	Visitor function to call. Return false to abort the foreach loop.
+			*	@param userData	Optional user data forwarded to the visitor.
+			* 
+			*	@return	The last visitor result before exiting the loop.
+			*			If the visitor is nullptr, return false.
+			* 
+			*	@exception Any exception potentially thrown from the provided visitor.
+			*/
+			REFUREKU_API bool	foreachInstantiator(std::size_t				argCount,
+													Visitor<StaticMethod>	visitor,
+													void*					userData)	const;
 	};
 
-	/**
-	*	@brief	Instantiate a class if it is default constructible.
-	*			This is the default method used to instantiate classes through Struct::makeInstance.
-	*			This method is not noexcept as the provided type T constructor is not guaranteed to be noexcept.
-	*	
-	*	@return A pointer to a newly allocated instance of the class if the class is default constructible, else nullptr.
-	*/
-	template <typename T>
-	void* defaultInstantiator();
+	REFUREKU_TEMPLATE_API(rfk::Allocator<Struct const*>);
+	REFUREKU_TEMPLATE_API(rfk::Vector<Struct const*, rfk::Allocator<Struct const*>>);
 
 	#include "Refureku/TypeInfo/Archetypes/Struct.inl"
 }

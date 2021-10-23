@@ -7,17 +7,18 @@
 
 #pragma once
 
-#include <Kodgen/Object.h>
+#include "Refureku/Config.h"
 
 namespace rfk
 {
 	//Forward declaration
 	class Struct;
+	class Struct;
 
 	/**
 	*	Base class which implements the virtual getArchetype method.
 	*/
-	class Object : public kodgen::Object
+	class REFUREKU_API Object
 	{
 		public:
 			Object()				= default;
@@ -25,6 +26,9 @@ namespace rfk
 			Object(Object&&)		= default;
 			virtual ~Object()		= default;
 
-			virtual	Struct const& getArchetype() const noexcept = 0;
+			virtual Struct const& getArchetype() const noexcept = 0;
+			
+			Object& operator=(Object const&)	= default;
+			Object& operator=(Object&&)			= default;
 	};
 }

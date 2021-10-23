@@ -1,5 +1,5 @@
 /**
-*	Copyright (c) 2020 Julien SOYSOUVANH - All Rights Reserved
+*	Copyright (c) 2021 Julien SOYSOUVANH - All Rights Reserved
 *
 *	This file is part of the Refureku library project which is released under the MIT License.
 *	See the README.md file for full license details.
@@ -7,21 +7,29 @@
 
 #pragma once
 
+#include "Refureku/Config.h"
+#include "Refureku/Misc/Pimpl.h"
+
 namespace rfk
 {
-	class Archetype;	//Forward declaration
+	//Forward declarations
+	class Archetype;
 
-	class ArchetypeRegisterer
+	namespace internal
 	{
-		private:
-			/** Registered archetype. */
-			Archetype const* _registeredArchetype = nullptr;
+		class ArchetypeRegistererImpl;
+	}
 
+	class ArchetypeRegisterer final
+	{
 		public:
-			ArchetypeRegisterer()							= default;
-			ArchetypeRegisterer(Archetype const* archetype)	noexcept;
-			ArchetypeRegisterer(ArchetypeRegisterer const&)	= delete;
-			ArchetypeRegisterer(ArchetypeRegisterer&&)		= delete;
-			~ArchetypeRegisterer()							noexcept;
+			REFUREKU_API ArchetypeRegisterer(Archetype const& archetype)	noexcept;
+			ArchetypeRegisterer(ArchetypeRegisterer const&)					= delete;
+			ArchetypeRegisterer(ArchetypeRegisterer&&)						= delete;
+			REFUREKU_API ~ArchetypeRegisterer()								noexcept;
+
+		private:
+			/** Pointer to ArchetypeRegisterer implementation. */
+			Pimpl<internal::ArchetypeRegistererImpl> _pimpl;
 	};
 }

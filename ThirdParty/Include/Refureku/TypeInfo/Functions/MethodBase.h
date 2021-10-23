@@ -1,5 +1,5 @@
 /**
-*	Copyright (c) 2020 Julien SOYSOUVANH - All Rights Reserved
+*	Copyright (c) 2021 Julien SOYSOUVANH - All Rights Reserved
 *
 *	This file is part of the Refureku library project which is released under the MIT License.
 *	See the README.md file for full license details.
@@ -8,68 +8,99 @@
 #pragma once
 
 #include "Refureku/TypeInfo/Functions/FunctionBase.h"
-#include "Refureku/TypeInfo/EAccessSpecifier.h"
 #include "Refureku/TypeInfo/Functions/EMethodFlags.h"
 
 namespace rfk
 {
 	class MethodBase : public FunctionBase
 	{
-		protected:
-			MethodBase()											= delete;
-			MethodBase(std::string&&				name, 
-					   uint64						id,
-					   Type const&					returnType,
-					   std::unique_ptr<ICallable>&&	internalMethod,
-					   EMethodFlags					flags)			noexcept;
-			MethodBase(MethodBase const&)							= delete;
-			MethodBase(MethodBase&&)								= delete;
-			~MethodBase()											= default;
-
 		public:
-			/** Flags describing this method. */
-			EMethodFlags	flags = EMethodFlags::Default;
-
 			/**
-			*	@return Access specifier of this method in its owner struct/class.
+			*	@brief	Check that another function has the same prototype as this function.
+			*			**WARNING:** Non reflected type archetypes are considered equal since their archetype is nullptr.
+			*	
+			*	@param other Function to compare the prototype with.
+			* 
+			*	@return true if the provided function has the same prototype as this function, else false.
 			*/
-			EAccessSpecifier	getAccess()			const	noexcept;
+			RFK_NODISCARD REFUREKU_API bool				hasSameSignature(MethodBase const& other)	const	noexcept;
 
 			/**
+			*	@brief Check if this method is static.
+			* 
 			*	@return true if this method is static, else false.
 			*/
-			inline bool			isStatic()			const	noexcept;
+			RFK_NODISCARD REFUREKU_API bool				isStatic()									const	noexcept;
 
 			/**
-			*	@return true if this method is declared as inline, else false.
+			*	@brief Check if this method is marked with the inline qualifier or defined in the header file.
+			* 
+			*	@return true if this method is inline, else false.
 			*/
-			inline bool			isInline()			const	noexcept;
+			RFK_NODISCARD REFUREKU_API bool				isInline()									const	noexcept;
 
 			/**
+			*	@brief Check if this method is virtual.
+			* 
 			*	@return true if this method is virtual, else false.
 			*/
-			inline bool			isVirtual()			const	noexcept;
+			RFK_NODISCARD REFUREKU_API bool				isVirtual()									const	noexcept;
 
 			/**
-			*	@return true if this method is virtual pure, else false.
+			*	@brief Check if this method is pure virtual.
+			* 
+			*	@return true if this method is pure virtual, else false.
 			*/
-			inline bool			isPureVirtual()		const	noexcept;
+			RFK_NODISCARD REFUREKU_API bool				isPureVirtual()								const	noexcept;
 
 			/**
-			*	@return true if this method overrides a previous definition, else false.
+			*	@brief	Check if this method is override-qualified.
+			*			**WARNING:** An overriding method not explicitly qualified with the override keyword will return false.
+			* 
+			*	@return true if this method is override-qualified, else false.
 			*/
-			inline bool			isOverride()		const	noexcept;
+			RFK_NODISCARD REFUREKU_API bool				isOverride()								const	noexcept;
 
 			/**
-			*	@return true if this method is marked as final, else false.
+			*	@brief	Check if this method is final-qualified.
+			*			**WARNING:** An override method part of a final class will return false.
+			* 
+			*	@return true if this method is final-qualified, else false.
 			*/
-			inline bool			isFinal()			const	noexcept;
+			RFK_NODISCARD REFUREKU_API bool				isFinal()									const	noexcept;
+			
+			/**
+			*	@brief Check if this method is const-qualified.
+			* 
+			*	@return true if this method is const-qualified, else false.
+			*/
+			RFK_NODISCARD REFUREKU_API bool				isConst()									const	noexcept;
 
 			/**
-			*	@return true if this method is marked as const, else false.
+			*	@brief Get the flags qualifying this method.
+			* 
+			*	@return The flags qualifying this method.
 			*/
-			inline bool			isConst()			const	noexcept;
+			RFK_NODISCARD REFUREKU_API EMethodFlags		getFlags()									const	noexcept;
+
+			/**
+			*	@brief Get the access specifier of this method in its owner struct/class.
+			* 
+			*	@return The access specifier of this method in its owner struct/class.
+			*/
+			RFK_NODISCARD REFUREKU_API EAccessSpecifier	getAccess()									const	noexcept;
+
+			//Keep parent FunctionBase::hasSameSignature<> template method
+			using FunctionBase::hasSameSignature;
+
+		protected:
+			//Forward declaration
+			class MethodBaseImpl;
+
+			REFUREKU_INTERNAL MethodBase(MethodBaseImpl* implementation)	noexcept;
+			REFUREKU_INTERNAL MethodBase(MethodBase&&)						noexcept;
+			REFUREKU_INTERNAL ~MethodBase()									noexcept;
+
+			RFK_GEN_GET_PIMPL(MethodBaseImpl, Entity::getPimpl())
 	};
-
-	#include "Refureku/TypeInfo/Functions/MethodBase.inl"
 }

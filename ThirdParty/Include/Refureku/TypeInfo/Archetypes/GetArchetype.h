@@ -1,5 +1,5 @@
 /**
-*	Copyright (c) 2020 Julien SOYSOUVANH - All Rights Reserved
+*	Copyright (c) 2021 Julien SOYSOUVANH - All Rights Reserved
 *
 *	This file is part of the Refureku library project which is released under the MIT License.
 *	See the README.md file for full license details.
@@ -7,16 +7,19 @@
 
 #pragma once
 
-#include <type_traits>
+#include <type_traits>	//std::is_function_v, std::is_member_object_pointer_v, std::is_pointer_v...
 
-#include "Refureku/TypeInfo/Archetypes/Enum.h"
-#include "Refureku/TypeInfo/Archetypes/ArchetypeRegisterer.h"
-#include "Refureku/Utility/TypeTraits.h"
+#include "Refureku/Config.h"
+#include "Refureku/TypeInfo/Archetypes/Enum.h"	//rfk::getEnum
+#include "Refureku/Misc/TypeTraitsMacros.h"
 
 namespace rfk
 {
+	RFK_GENERATE_IS_CALLABLE_METHOD_TRAITS(staticGetArchetype)
+
 	/**
 	*	@brief	Get the archetype of any type if it exists.
+	*			Note that this method will always return nullptr on protected/private nested archetypes.
 	*			If a cv-qualified, pointer/reference, array type is passed, they are all ignored and the raw type archetype is returned.
 	*			Example:	int* -> int,
 	*						int[2] -> int,
@@ -28,95 +31,86 @@ namespace rfk
 	*	@return The archetype of the provided type if it exists, else nullptr.
 	*/
 	template <typename T>
-	Archetype const* getArchetype() noexcept;
+	Archetype const*				getArchetype()						noexcept;
+
+	/**
+	*	@brief	Get archetype for template classes. Cover only most common cases.
+	* 
+	*	@return The archetype of the provided type if it exists, else nullptr.
+	*/
+	template <template <typename...> typename T>
+	Archetype const*				getArchetype()						noexcept;	//Variadic type template parameters
+
+	template <template <auto...> typename T>
+	Archetype const*				getArchetype()						noexcept;	//Variadic non-type template parameters
+
+#if RFK_TEMPLATE_TEMPLATE_SUPPORT
+	template <template <template <typename...> typename...> typename T>
+	Archetype const*				getArchetype()						noexcept;	//Variadic template template type parameters
+#endif
 
 	/**
 	*	rfk::getArchetype specialization for all fundamental types.
 	*/
 	template <>
-	rfk::Archetype const* getArchetype<void>()					noexcept;
+	REFUREKU_API Archetype const* getArchetype<void>()					noexcept;
 
 	template <>
-	rfk::Archetype const* getArchetype<std::nullptr_t>()		noexcept;
+	REFUREKU_API Archetype const* getArchetype<std::nullptr_t>()		noexcept;
 
 	template <>
-	rfk::Archetype const* getArchetype<bool>()					noexcept;
+	REFUREKU_API Archetype const* getArchetype<bool>()					noexcept;
 
 	template <>
-	rfk::Archetype const* getArchetype<char>()					noexcept;
+	REFUREKU_API Archetype const* getArchetype<char>()					noexcept;
 
 	template <>
-	rfk::Archetype const* getArchetype<signed char>()			noexcept;
+	REFUREKU_API Archetype const* getArchetype<signed char>()			noexcept;
 
 	template <>
-	rfk::Archetype const* getArchetype<unsigned char>()			noexcept;
+	REFUREKU_API Archetype const* getArchetype<unsigned char>()			noexcept;
 
 	template <>
-	rfk::Archetype const* getArchetype<wchar_t>()				noexcept;
+	REFUREKU_API Archetype const* getArchetype<wchar_t>()				noexcept;
 
 	template <>
-	rfk::Archetype const* getArchetype<char16_t>()				noexcept;
+	REFUREKU_API Archetype const* getArchetype<char16_t>()				noexcept;
 
 	template <>
-	rfk::Archetype const* getArchetype<char32_t>()				noexcept;
+	REFUREKU_API Archetype const* getArchetype<char32_t>()				noexcept;
 
 	template <>
-	rfk::Archetype const* getArchetype<short>()					noexcept;
+	REFUREKU_API Archetype const* getArchetype<short>()					noexcept;
 
 	template <>
-	rfk::Archetype const* getArchetype<unsigned short>()		noexcept;
+	REFUREKU_API Archetype const* getArchetype<unsigned short>()		noexcept;
 
 	template <>
-	rfk::Archetype const* getArchetype<int>()					noexcept;
+	REFUREKU_API Archetype const* getArchetype<int>()					noexcept;
 
 	template <>
-	rfk::Archetype const* getArchetype<unsigned int>()			noexcept;
+	REFUREKU_API Archetype const* getArchetype<unsigned int>()			noexcept;
 
 	template <>
-	rfk::Archetype const* getArchetype<long>()					noexcept;
+	REFUREKU_API Archetype const* getArchetype<long>()					noexcept;
 
 	template <>
-	rfk::Archetype const* getArchetype<unsigned long>()			noexcept;
+	REFUREKU_API Archetype const* getArchetype<unsigned long>()			noexcept;
 
 	template <>
-	rfk::Archetype const* getArchetype<long long>()				noexcept;
+	REFUREKU_API Archetype const* getArchetype<long long>()				noexcept;
 
 	template <>
-	rfk::Archetype const* getArchetype<unsigned long long>()	noexcept;
+	REFUREKU_API Archetype const* getArchetype<unsigned long long>()	noexcept;
 
 	template <>
-	rfk::Archetype const* getArchetype<float>()					noexcept;
+	REFUREKU_API Archetype const* getArchetype<float>()					noexcept;
 
 	template <>
-	rfk::Archetype const* getArchetype<double>()				noexcept;
+	REFUREKU_API Archetype const* getArchetype<double>()				noexcept;
 
 	template <>
-	rfk::Archetype const* getArchetype<long double>()			noexcept;
-
-	//Register all of these archetypes to database
-	namespace internal
-	{
-		inline ArchetypeRegisterer voidRegisterer		= getArchetype<void>();
-		inline ArchetypeRegisterer nullptrRegisterer	= getArchetype<std::nullptr_t>();
-		inline ArchetypeRegisterer boolRegisterer		= getArchetype<bool>();
-		inline ArchetypeRegisterer charRegisterer		= getArchetype<char>();
-		inline ArchetypeRegisterer signedCharRegisterer	= getArchetype<signed char>();
-		inline ArchetypeRegisterer ucharRegisterer		= getArchetype<unsigned char>();
-		inline ArchetypeRegisterer wcharRegisterer		= getArchetype<wchar_t>();
-		inline ArchetypeRegisterer char16Registerer		= getArchetype<char16_t>();
-		inline ArchetypeRegisterer char32Registerer		= getArchetype<char32_t>();
-		inline ArchetypeRegisterer shortRegisterer		= getArchetype<short>();
-		inline ArchetypeRegisterer ushortRegisterer		= getArchetype<unsigned short>();
-		inline ArchetypeRegisterer intRegisterer		= getArchetype<int>();
-		inline ArchetypeRegisterer uintRegisterer		= getArchetype<unsigned int>();
-		inline ArchetypeRegisterer longRegisterer		= getArchetype<long>();
-		inline ArchetypeRegisterer ulongRegisterer		= getArchetype<unsigned long>();
-		inline ArchetypeRegisterer longLongRegisterer	= getArchetype<long long>();
-		inline ArchetypeRegisterer ulongLongRegisterer	= getArchetype<unsigned long long>();
-		inline ArchetypeRegisterer floatRegisterer		= getArchetype<float>();
-		inline ArchetypeRegisterer doubleRegisterer		= getArchetype<double>();
-		inline ArchetypeRegisterer longDoubleRegisterer	= getArchetype<long double>();
-	}
+	REFUREKU_API Archetype const* getArchetype<long double>()			noexcept;
 
 	#include "Refureku/TypeInfo/Archetypes/GetArchetype.inl"
 }

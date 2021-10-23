@@ -1,5 +1,5 @@
 /**
-*	Copyright (c) 2020 Julien SOYSOUVANH - All Rights Reserved
+*	Copyright (c) 2021 Julien SOYSOUVANH - All Rights Reserved
 *
 *	This file is part of the Refureku library project which is released under the MIT License.
 *	See the README.md file for full license details.
@@ -15,114 +15,102 @@ namespace rfk
 {
 	class Function final : public FunctionBase
 	{
-		private:
-			/**
-			*	@brief Invoke the internal function using passed arguments.
-			*	
-			*	@tparam		ReturnType Return type of the internal function.
-			*	@tparam...	ArgTypes Passed argument types.
-			*
-			*	@param... arguments Arguments to forward to the internal function.
-			*	
-			*	@return The result of the internal function call.
-			*/
-			template <typename ReturnType, typename... ArgTypes>
-			ReturnType	internalInvoke(ArgTypes&&... arguments) const noexcept;
-
 		public:
-			/** Flags describing this function. */
-			EFunctionFlags	flags = EFunctionFlags::Default;
-
-			Function()												= delete;
-			Function(std::string&&					name, 
-					 uint64							id,
-					 Type const&					returnType,
-					 std::unique_ptr<ICallable>&&	internalMethod,
-					 EFunctionFlags					flags)			noexcept;
-			Function(Function const&)								= delete;
+			REFUREKU_API Function(char const*		name, 
+								  std::size_t		id,
+								  Type const&		returnType,
+								  ICallable*		internalFunction,
+								  EFunctionFlags	flags)			noexcept;
 			Function(Function&&)									= delete;
-			~Function()												= default;
+			REFUREKU_API ~Function()								noexcept;
 
 			/**
-			*	@brief Call the function with the provided argument(s) if any, and return the result.
+			*	@brief	Call the function with the forwarded argument(s) if any, and return the result.
+			*			Providing bad return type / parameters is undefined behaviour.
+			*			**WARNING**: Template type deduction might forward wrong types to the function
+			*			(int instead of int8_t or char* instead of std::string for example), so it is recommended
+			*			to explicitly specify all template types when calling the function.
 			*
-			*	In debug mode (NDEBUG macro not defined), checks that the correct number of
-			*	arguments is passed before actually invoking the underlying function.
-			*	If it is incorrect, a ArgCountMismatch exception is thrown.
-			*	Type checks are not performed so calling this function with bad parameters might lead to a crash or unexpected behavior.
+			*	@tparam ReturnType	Return type of the function.
+			*	@tparam... ArgTypes	Type of all arguments. This can in some cases be omitted thanks to template deduction.
 			*
-			*	\tparam ReturnType Return type of the function
-			*	\tparam... ArgTypes Type of all arguments. This can in some cases be omitted thanks to template deduction.
+			*	@param args Arguments forwarded to the function call.
+			* 
+			*	@return The result of the function call.
+			* 
+			*	@exception Any exception potentially thrown from the underlying function.
+			*/
+			template <typename ReturnType = void, typename... ArgTypes>
+			ReturnType									invoke(ArgTypes&&... args)			const;
+
+			/**
+			*	@brief	Call the function with the forwarded argument(s) if any, and return the result.
+			*			The return type and arguments types will be strictly checked before calling the function.
+			*			If there is any mismatch, ArgCountMismatch, ArgTypeMismatch or ReturnTypeMismatch will be thrown.
+			*			**WARNING 1**: Unreflected archetypes can't be compared, so they will pass through the type checks.
+			*			**WARNING 2**: Template type deduction might forward wrong types to the function
+			*			(int instead of int8_t or char* instead of std::string for example), so it is recommended
+			*			to explicitly specify all template types when calling the function.
 			*
-			*	@param arguments Arguments provided to the function call. 
+			*	@tparam ReturnType	Return type of the function.
+			*	@tparam... ArgTypes	Type of all arguments. This can in some cases be omitted thanks to template deduction.
+			*
+			*	@param args Arguments forwarded to the function call.
 			*
 			*	@return The result of the function call.
+			* 
+			*	@exception	ArgCountMismatch if sizeof...(ArgTypes) is not the same as the value returned by getParametersCount().
+			*	@exception	ArgTypeMismatch if ArgTypes... are not strictly the same as this function parameter types.
+			*				**WARNING**: Be careful to template deduction.
+			*	@exception	ReturnTypeMismatch if ReturnType is not strictly the same as this function return type.
+			*	@exception	Any exception potentially thrown from the underlying function.
+			*/
+			template <typename ReturnType = void, typename... ArgTypes>
+			ReturnType									checkedInvoke(ArgTypes&&... args)	const;
+
+			/**
+			*	@brief Check whether this function is inline or not.
+			*
+			*	@return true if this function is inline, else false.
+			*/
+			RFK_NODISCARD REFUREKU_API bool				isInline()							const	noexcept;
+
+			/**
+			*	@brief Check whether this function is static or not.
+			*
+			*	@return true if this function is static, else false.
+			*/
+			RFK_NODISCARD REFUREKU_API bool				isStatic()							const	noexcept;
+
+			/**
+			*	@brief Get the flags qualifying this function.
+			* 
+			*	@return The flags qualifying this function.
+			*/
+			RFK_NODISCARD REFUREKU_API EFunctionFlags	getFlags()							const	noexcept;
+
+		private:
+			//Forward declaration
+			class FunctionImpl;
+
+			RFK_GEN_GET_PIMPL(FunctionImpl, Entity::getPimpl())
+
+			/**
+			*	@brief Call the underlying function with the forwarded args.
+			* 
+			*	@tparam ReturnType	Return type of the function.
+			*	@tparam... ArgTypes	Type of all arguments.
+			*
+			*	@param args Arguments forwarded to the underlying function call.
+			*
+			*	@return The result of the underlying function call.
 			*/
 			template <typename ReturnType, typename... ArgTypes>
-			ReturnType	rInvoke(ArgTypes&&... arguments)		const noexcept(REFUREKU_RELEASE);
-
-			/**
-			*	@brief Call the function with the provided argument(s) if any.
-			*
-			*	In debug mode (NDEBUG macro not defined), checks that the correct number of
-			*	arguments is passed to the function call before actually invoking the underlying function.
-			*	If it is incorrect, a ArgCountMismatch exception is thrown.
-			*	Type checks are not performed so calling this function with bad parameters might lead to a crash or unexpected behavior.
-			*
-			*	@tparam ArgTypes... Type of all arguments. This can in some cases be omitted thanks to template deduction.
-			*
-			*	@param arguments... Arguments provided to the function call.
-			*/
-			template <typename... ArgTypes>
-			void		invoke(ArgTypes&&... arguments)			const noexcept(REFUREKU_RELEASE);
-
-			/**
-			*	@brief Call the function with the provided argument(s) if any, and return the result.
-			*
-			*	Checks the argument count and the type of each argument before actually invoking the underlying function.
-			*	If any of those is incorrect, a ArgCountMismatch, ArgTypeMismatch, or ReturnTypeMismatch exception is thrown.
-			*
-			*	@tparam		ReturnType	Return type of the function
-			*	@tparam...	ArgTypes	Type of all arguments. This can in some cases be omitted thanks to template deduction,
-			*							but it is always safer to explicitly specify each template type to avoid type mismatches (a char* could
-			*							be template deducted as a char[], and as they are different types a MethodError exception will be thrown).
-			*
-			*	@param arguments... Arguments provided to the function call.
-			*
-			*	@return The result of the function call.
-			*/
-			template <typename ReturnType, typename... ArgTypes>
-			ReturnType	checkedRInvoke(ArgTypes&&... arguments)	const;
-
-			/**
-			*	@brief Call the function with the provided argument(s) if any.
-			*
-			*	Checks the argument count and the type of each argument before actually invoking the underlying function.
-			*	If any of those is incorrect, a ArgCountMismatch or ArgTypeMismatch exception is thrown.
-			*
-			*	@tparam... ArgTypes Type of all arguments. This can in some cases be omitted thanks to template deduction,
-			*		but it is always safer to explicitly specify each template type to avoid type mismatches (a char* could
-			*		be template deducted as a char[], and as they are different types a MethodError exception will be thrown).
-			*
-			*	@param arguments... Arguments provided to the function call.
-			*/
-			template <typename... ArgTypes>
-			void		checkedInvoke(ArgTypes&&... arguments)	const;
-
-			/**
-			*	@brief Check if this function is inline.
-			*
-			*	@return true if the function is inline, else false.
-			*/
-			bool	isInline()									const noexcept;
-
-			/**
-			*	@brief Check if this function is static.
-			*
-			*	@return true if the function is static, else false.
-			*/
-			bool	isStatic()									const noexcept;
+			ReturnType	internalInvoke(ArgTypes&&... args)	const;
 	};
+
+	REFUREKU_TEMPLATE_API(rfk::Allocator<Function const*>);
+	REFUREKU_TEMPLATE_API(rfk::Vector<Function const*, rfk::Allocator<Function const*>>);
 
 	#include "Refureku/TypeInfo/Functions/Function.inl"
 }

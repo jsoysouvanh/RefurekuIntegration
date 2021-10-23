@@ -8,16 +8,12 @@
 #pragma once
 
 #include <stdexcept>
-#include <string>
 
 namespace rfk
 {
 	class TypeMismatch : public std::logic_error
 	{
 		public:
-			explicit TypeMismatch(std::string const& errorMessage)	noexcept;
-			TypeMismatch(TypeMismatch const&)						= default;
-			TypeMismatch(TypeMismatch&&)							= default;
-			~TypeMismatch()											= default;
+			using std::logic_error::logic_error;
 	};
 }

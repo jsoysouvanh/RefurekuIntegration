@@ -7,8 +7,9 @@
 
 #pragma once
 
+#include "Refureku/Config.h"
 #include "Refureku/Misc/FundamentalTypes.h"
-#include "Refureku/Utility/EnumMacros.h"
+#include "Refureku/Misc/EnumMacros.h"
 
 namespace rfk
 {
@@ -57,5 +58,5 @@ namespace rfk
 		EnumValue				= 1 << 9
 	};
 
-	GENERATE_ENUM_OPERATORS(EEntityKind)
+	RFK_GENERATE_ENUM_OPERATORS(EEntityKind)
 }

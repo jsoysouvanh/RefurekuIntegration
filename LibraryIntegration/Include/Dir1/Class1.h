@@ -2,28 +2,28 @@
 
 #include <iostream>
 
-#include "Generated/Class1.rfk.h"
+#include "Generated/Class1.rfkh.h"
 
-namespace test RFKNamespace()
+namespace test NAMESPACE()
 {
-	class RFKClass() Class1
+	class CLASS() Class1
 	{
 		private:
-			RFKField()
+			FIELD()
 			int	someInt = 2;
 
-			RFKMethod()
+			METHOD()
 			void method1()	noexcept { std::cout << "Class1::method1();" << std::endl; }
 
 		protected:
-			RFKField() 
+			FIELD() 
 			float	someFloat = 0.0f;
 
 		public:
 			Class1()	= default;
 
-		Class1_GENERATED
+		test_Class1_GENERATED
 	};
 }
 
-File_GENERATED
+File_Class1_GENERATED

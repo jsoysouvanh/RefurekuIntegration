@@ -1,50 +1,25 @@
 /**
-*	Copyright (c) 2020 Julien SOYSOUVANH - All Rights Reserved
+*	Copyright (c) 2021 Julien SOYSOUVANH - All Rights Reserved
 *
 *	This file is part of the Refureku library project which is released under the MIT License.
 *	See the README.md file for full license details.
 */
 
-template <typename DataType>
-DataType StaticField::getData() const noexcept
+template <typename ValueType>
+ValueType StaticField::get() const
 {
-	if constexpr (std::is_rvalue_reference_v<DataType>)
+	if constexpr (VariableBase::is_value_v<ValueType> || std::is_const_v<std::remove_reference_t<ValueType>>)
 	{
-		return std::move(*reinterpret_cast<std::remove_reference_t<DataType>*>(getDataAddress()));
-	}
-	else if constexpr (std::is_lvalue_reference_v<DataType>)
-	{
-		return *reinterpret_cast<std::remove_reference_t<DataType>*>(getDataAddress());
-	}
-	else	//By value
-	{
-		return DataType(*reinterpret_cast<DataType*>(getDataAddress()));
-	}
-}
-
-template <typename DataType>
-void StaticField::setData(DataType&& data) const noexcept
-{
-	if constexpr (std::is_rvalue_reference_v<DataType&&>)
-	{
-		*reinterpret_cast<DataType*>(getDataAddress()) = std::forward<DataType&&>(data);
-	}
-	else if constexpr (std::is_lvalue_reference_v<DataType&&>)
-	{
-		*reinterpret_cast<std::remove_reference_t<DataType&&>*>(getDataAddress()) = data;
+		return VariableBase::get<ValueType>(getConstPtr());
 	}
 	else
 	{
-		assert(false);	//How can we get here?
+		return VariableBase::get<ValueType>(getPtr());
 	}
 }
 
-inline void* StaticField::getDataAddress() const noexcept
+template <typename ValueType>
+void StaticField::set(ValueType&& data) const
 {
-	return dataAddress;
-}
-
-inline void StaticField::setData(void const* data, uint64 dataSize) const noexcept
-{
-	std::memcpy(getDataAddress(), data, dataSize);
+	VariableBase::set(getPtr(), std::forward<ValueType>(data));
 }

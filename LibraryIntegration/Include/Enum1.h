@@ -1,8 +1,8 @@
 #pragma once
 
-#include "Generated/Enum1.rfk.h"
+#include "Generated/Enum1.rfkh.h"
 
-enum class RFKEnum() Enum1
+enum class ENUM() Enum1
 {
 	Top,
 	Right,
@@ -12,4 +12,4 @@ enum class RFKEnum() Enum1
 	COUNT  
 };
 
-File_GENERATED
+File_Enum1_GENERATED

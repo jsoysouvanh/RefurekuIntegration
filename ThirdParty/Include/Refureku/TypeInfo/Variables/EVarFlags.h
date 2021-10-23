@@ -8,7 +8,7 @@
 #pragma once
 
 #include "Refureku/Misc/FundamentalTypes.h"
-#include "Refureku/Utility/EnumMacros.h"
+#include "Refureku/Misc/EnumMacros.h"
 
 namespace rfk
 {
@@ -21,5 +21,5 @@ namespace rfk
 		Static			= 1 << 0
 	};
 
-	GENERATE_ENUM_OPERATORS(EVarFlags)
+	RFK_GENERATE_ENUM_OPERATORS(EVarFlags)
 }

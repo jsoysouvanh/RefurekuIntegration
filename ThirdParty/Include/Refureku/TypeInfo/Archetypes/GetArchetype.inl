@@ -1,5 +1,5 @@
 /**
-*	Copyright (c) 2020 Julien SOYSOUVANH - All Rights Reserved
+*	Copyright (c) 2021 Julien SOYSOUVANH - All Rights Reserved
 *
 *	This file is part of the Refureku library project which is released under the MIT License.
 *	See the README.md file for full license details.
@@ -24,9 +24,13 @@ Archetype const* getArchetype() noexcept
 		}
 		else if constexpr (std::is_class_v<RawType>)
 		{
-			if constexpr (isReflectedClass<RawType>)
+			if constexpr (std::is_const_v<T> || std::is_volatile_v<T> || std::is_reference_v<T>)
 			{
-				return &RawType::staticGetArchetype();
+				return getArchetype<RawType>();
+			}
+			else if constexpr (isCallable_staticGetArchetype<T, Archetype const&()>::value)
+			{
+				return &T::staticGetArchetype();
 			}
 			else
 			{
@@ -43,3 +47,25 @@ Archetype const* getArchetype() noexcept
 		}
 	}
 }
+
+template <template <typename...> typename T>
+Archetype const* getArchetype() noexcept
+{
+	return nullptr;
+}
+
+template <template <auto...> typename T>
+Archetype const* getArchetype() noexcept
+{
+	return nullptr;
+}
+
+#if RFK_TEMPLATE_TEMPLATE_SUPPORT
+
+template <template <template <typename...> typename...> typename T>
+Archetype const* getArchetype() noexcept
+{
+	return nullptr;
+}
+
+#endif

@@ -1,74 +1,79 @@
 /**
-*	Copyright (c) 2020 Julien SOYSOUVANH - All Rights Reserved
+*	Copyright (c) 2021 Julien SOYSOUVANH - All Rights Reserved
 *
 *	This file is part of the Refureku library project which is released under the MIT License.
 *	See the README.md file for full license details.
 */
 
-template <typename DataType>
-DataType Field::getData(void* instance) const noexcept
+template <typename ValueType, typename OwnerStructType, typename>
+ValueType Field::get(OwnerStructType& instance) const
 {
-	if constexpr (std::is_rvalue_reference_v<DataType>)
-	{
-		return std::move(*reinterpret_cast<std::remove_reference_t<DataType>*>(getDataAddress(instance)));
-	}
-	else if constexpr (std::is_lvalue_reference_v<DataType>)
-	{
-		return *reinterpret_cast<std::remove_reference_t<DataType>*>(getDataAddress(instance));
-	}
-	else	//By value
-	{
-		return DataType(*reinterpret_cast<DataType*>(getDataAddress(instance)));
-	}
+	return getInternal<ValueType>(&instance);
 }
 
-template <typename DataType>
-DataType Field::getData(void const* instance) const noexcept
+template <typename ValueType>
+ValueType Field::getInternal(void* instance) const
 {
-	if constexpr (std::is_rvalue_reference_v<DataType>)
+	if constexpr (VariableBase::is_value_v<ValueType> || std::is_const_v<std::remove_reference_t<ValueType>>)
 	{
-		return std::move(*reinterpret_cast<std::remove_reference_t<DataType> const*>(getDataAddress(instance)));
-	}
-	else if constexpr (std::is_lvalue_reference_v<DataType>)
-	{
-		return *reinterpret_cast<std::remove_reference_t<DataType> const*>(getDataAddress(instance));
-	}
-	else	//By value
-	{
-		return DataType(*reinterpret_cast<DataType const*>(getDataAddress(instance)));
-	}
-}
-
-template <typename DataType>
-void Field::setData(void* instance, DataType&& data) const noexcept
-{
-	if constexpr (std::is_rvalue_reference_v<DataType&&>)
-	{
-		*reinterpret_cast<DataType*>(getDataAddress(instance)) = std::forward<DataType&&>(data);
-	}
-	else if constexpr (std::is_lvalue_reference_v<DataType&&>)
-	{
-		*reinterpret_cast<std::remove_reference_t<DataType&&>*>(getDataAddress(instance)) = data;
+		return FieldBase::get<ValueType>(getConstPtrInternal(instance));
 	}
 	else
 	{
-		assert(false);	//How can we get here?
+		return FieldBase::get<ValueType>(getPtrInternal(instance));
 	}
 }
 
-inline void* Field::getDataAddress(void* instance) const noexcept
+template <typename ValueType, typename OwnerStructType, typename>
+ValueType Field::get(OwnerStructType const& instance) const
 {
-	assert(instance != nullptr);
-
-	return reinterpret_cast<char*>(instance) + memoryOffset;
+	return getInternal<ValueType>(&instance);
 }
 
-inline void const* Field::getDataAddress(void const* instance) const noexcept
+template <typename ValueType>
+ValueType const Field::getInternal(void const* instance) const noexcept
 {
-	return reinterpret_cast<char const*>(instance) + memoryOffset;
+	static_assert(!std::is_rvalue_reference_v<ValueType>, "Can't call Field::get with an rvalue reference ValueType from a const instance.");
+
+	return FieldBase::get<ValueType>(getConstPtrInternal(instance));
+
+	/*if constexpr (VariableBase::is_value_v<ValueType> || std::is_const_v<std::remove_reference_t<ValueType>>)
+	{
+		
+	}
+	else
+	{
+
+	}
+	return FieldBase::get<ValueType>(const_cast<void*>(getConstPtrInternal(instance)));*/
 }
 
-inline void Field::setData(void* instance, void const* data, uint64 dataSize) const noexcept
+template <typename ValueType, typename OwnerStructType, typename>
+void Field::set(OwnerStructType& instance, ValueType&& value) const
 {
-	std::memcpy(getDataAddress(instance), data, dataSize);
+	setInternal<ValueType>(&instance, std::forward<ValueType>(value));
+}
+
+template <typename ValueType>
+void Field::setInternal(void* instance, ValueType&& value) const
+{
+	FieldBase::set(getPtrInternal(instance), std::forward<ValueType>(value));
+}
+
+template <typename OwnerStructType, typename>
+void Field::set(OwnerStructType& instance, void const* valuePtr, std::size_t valueSize) const
+{
+	setInternal(&instance, valuePtr, valueSize);
+}
+
+template <typename OwnerStructType, typename>
+void* Field::getPtr(OwnerStructType& instance) const
+{
+	return getPtrInternal(&instance);
+}
+
+template <typename OwnerStructType, typename>
+void const* Field::getConstPtr(OwnerStructType const& instance) const noexcept
+{
+	return getConstPtrInternal(&instance);
 }

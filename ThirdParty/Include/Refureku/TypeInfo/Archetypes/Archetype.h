@@ -1,13 +1,11 @@
 /**
-*	Copyright (c) 2020 Julien SOYSOUVANH - All Rights Reserved
+*	Copyright (c) 2021 Julien SOYSOUVANH - All Rights Reserved
 *
 *	This file is part of the Refureku library project which is released under the MIT License.
 *	See the README.md file for full license details.
 */
 
 #pragma once
-
-#include <type_traits>
 
 #include "Refureku/TypeInfo/Entity/Entity.h"
 #include "Refureku/TypeInfo/EAccessSpecifier.h"
@@ -16,22 +14,41 @@ namespace rfk
 {
 	class Archetype : public Entity
 	{
-		protected:
-			Archetype(std::string&& newName,
-					  uint64		newId,
-					  EEntityKind	kind,
-					  uint64		newMemorySize)	noexcept;
-			Archetype(Archetype const&)				= delete;
-			Archetype(Archetype&&)					= delete;
-			~Archetype()							= default;
-
 		public:
-			/** Access specifier of this archetype. Relevant only when this archetype is nested (Undefined otherwise). */
-			EAccessSpecifier	accessSpecifier	= EAccessSpecifier::Undefined;
+			Archetype(Archetype&&) = delete;
 
-			/** Size in bytes an instance of this archetype takes in memory, basically what sizeof(Type) returns */
-			uint64				memorySize		= 0;
+			/**
+			*	@brief	Get the access specifier of the archetype if it is nested in a struct or class.
+			*			If the archetype is not nested in a struct or class, EAccessSpecifier::Undefined is returned.
+			* 
+			*	@return The access specifier of the archetype.
+			*/
+			RFK_NODISCARD REFUREKU_API EAccessSpecifier	getAccessSpecifier()			const	noexcept;
+
+			/**
+			*	@brief Get the memory size of an instance of the archetype, as the operator sizeof(type) would do.
+			* 
+			*	@return The memory size of an instance of the archetype.
+			*/
+			RFK_NODISCARD REFUREKU_API std::size_t		getMemorySize()					const	noexcept;
+
+			/**
+			*	@brief Set the access specifier of the archetype in its outer struct/class.
+			* 
+			*	@param _ The new access specifier of this archetype.
+			*/
+			REFUREKU_API void							setAccessSpecifier(EAccessSpecifier _)	noexcept;
+
+		protected:
+			//Forward declaration
+			class ArchetypeImpl;
+
+			REFUREKU_INTERNAL Archetype(ArchetypeImpl* implementation)	noexcept;
+			REFUREKU_INTERNAL ~Archetype()								noexcept;
+
+			RFK_GEN_GET_PIMPL(ArchetypeImpl, Entity::getPimpl())
 	};
 
-	#include "Refureku/TypeInfo/Archetypes/Archetype.inl"
+	REFUREKU_TEMPLATE_API(rfk::Allocator<Archetype const*>);
+	REFUREKU_TEMPLATE_API(rfk::Vector<Archetype const*, rfk::Allocator<Archetype const*>>);
 }

@@ -1,57 +1,53 @@
 /**
-*	Copyright (c) 2020 Julien SOYSOUVANH - All Rights Reserved
+*	Copyright (c) 2021 Julien SOYSOUVANH - All Rights Reserved
 *
 *	This file is part of the Refureku library project which is released under the MIT License.
 *	See the README.md file for full license details.
 */
 
-template <typename ReturnType, typename... ArgTypes>
-ReturnType Method::internalInvoke(void const* caller, ArgTypes&&... arguments) const noexcept
+template <typename ReturnType, typename CallerType, typename... ArgTypes>
+ReturnType Method::internalInvoke(CallerType& caller, ArgTypes&&... args) const
 {
-	return reinterpret_cast<MemberFunction<DummyClass, ReturnType(ArgTypes...)>*>(internalMethod.get())->operator()(caller, std::forward<ArgTypes>(arguments)...);
+	return reinterpret_cast<MemberFunction<CallerType, ReturnType(ArgTypes...)>*>(getInternalFunction())->operator()(caller, std::forward<ArgTypes>(args)...);
 }
 
-template <typename... ArgTypes>
-void Method::invoke(void const* caller, ArgTypes&&... arguments) const noexcept(REFUREKU_RELEASE)
+template <typename ReturnType, typename CallerType, typename... ArgTypes>
+ReturnType Method::internalInvoke(CallerType const& caller, ArgTypes&&... args) const
 {
-	#if REFUREKU_DEBUG
-
-	checkArgumentsCount<ArgTypes...>();
-
-	#endif
-
-	internalInvoke<void, ArgTypes...>(std::forward<void const*>(caller), std::forward<ArgTypes>(arguments)...);
+	return reinterpret_cast<MemberFunction<CallerType, ReturnType(ArgTypes...)>*>(getInternalFunction())->operator()(caller, std::forward<ArgTypes>(args)...);
 }
 
-template <typename ReturnType, typename... ArgTypes>
-ReturnType Method::rInvoke(void const* caller, ArgTypes&&... arguments) const noexcept(REFUREKU_RELEASE)
+template <typename ReturnType, typename CallerType, typename... ArgTypes, typename>
+ReturnType Method::invoke(CallerType& caller, ArgTypes&&... args) const
 {
-	static_assert(!std::is_void_v<ReturnType>, "ReturnType can't be void.");
-
-	#if REFUREKU_DEBUG
-
-	checkArgumentsCount<ArgTypes...>();
-
-	#endif
-
-	return internalInvoke<ReturnType, ArgTypes...>(std::forward<void const*>(caller), std::forward<ArgTypes>(arguments)...);
+	return internalInvoke<ReturnType, CallerType, ArgTypes...>(caller, std::forward<ArgTypes>(args)...);
 }
 
-template <typename... ArgTypes>
-void Method::checkedInvoke(void const* caller, ArgTypes&&... arguments) const
+template <typename ReturnType, typename CallerType, typename... ArgTypes>
+ReturnType Method::invoke(CallerType const& caller, ArgTypes&&... args) const
 {
-	checkArguments<ArgTypes...>();
+	if (!isConst())
+	{
+		throwConstViolationException("Can't call a non-const member function on a const caller instance.");
+	}
 
-	internalInvoke<void, ArgTypes...>(std::forward<void const*>(caller), std::forward<ArgTypes>(arguments)...);
+	return internalInvoke<ReturnType, CallerType, ArgTypes...>(caller, std::forward<ArgTypes>(args)...);
 }
 
-template <typename ReturnType, typename... ArgTypes>
-ReturnType Method::checkedRInvoke(void const* caller, ArgTypes&&... arguments) const
+template <typename ReturnType, typename CallerType, typename... ArgTypes, typename>
+ReturnType Method::checkedInvoke(CallerType& caller, ArgTypes&&... args) const
 {
-	static_assert(!std::is_void_v<ReturnType>, "ReturnType can't be void.");
-
 	checkReturnType<ReturnType>();
-	checkArguments<ArgTypes...>();
+	checkParameterTypes<ArgTypes...>();
 
-	return internalInvoke<ReturnType, ArgTypes...>(std::forward<void const*>(caller), std::forward<ArgTypes>(arguments)...);
+	return invoke<ReturnType, CallerType, ArgTypes...>(caller, std::forward<ArgTypes>(args)...);
+}
+
+template <typename ReturnType, typename CallerType, typename... ArgTypes>
+ReturnType Method::checkedInvoke(CallerType const& caller, ArgTypes&&... args) const
+{
+	checkReturnType<ReturnType>();
+	checkParameterTypes<ArgTypes...>();
+
+	return invoke<ReturnType, CallerType, ArgTypes...>(caller, std::forward<ArgTypes>(args)...);
 }
