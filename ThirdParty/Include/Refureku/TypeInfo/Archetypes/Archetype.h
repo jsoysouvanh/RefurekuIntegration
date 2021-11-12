@@ -2,7 +2,7 @@
 *	Copyright (c) 2021 Julien SOYSOUVANH - All Rights Reserved
 *
 *	This file is part of the Refureku library project which is released under the MIT License.
-*	See the README.md file for full license details.
+*	See the LICENSE.md file for full license details.
 */
 
 #pragma once
@@ -23,21 +23,24 @@ namespace rfk
 			* 
 			*	@return The access specifier of the archetype.
 			*/
-			RFK_NODISCARD REFUREKU_API EAccessSpecifier	getAccessSpecifier()			const	noexcept;
+			RFK_NODISCARD REFUREKU_API
+				EAccessSpecifier			getAccessSpecifier()				const	noexcept;
 
 			/**
 			*	@brief Get the memory size of an instance of the archetype, as the operator sizeof(type) would do.
 			* 
 			*	@return The memory size of an instance of the archetype.
 			*/
-			RFK_NODISCARD REFUREKU_API std::size_t		getMemorySize()					const	noexcept;
+			RFK_NODISCARD REFUREKU_API
+				std::size_t					getMemorySize()						const	noexcept;
 
 			/**
 			*	@brief Set the access specifier of the archetype in its outer struct/class.
 			* 
-			*	@param _ The new access specifier of this archetype.
+			*	@param access The new access specifier of this archetype.
 			*/
-			REFUREKU_API void							setAccessSpecifier(EAccessSpecifier _)	noexcept;
+			REFUREKU_API
+				void						setAccessSpecifier(EAccessSpecifier access)	noexcept;
 
 		protected:
 			//Forward declaration

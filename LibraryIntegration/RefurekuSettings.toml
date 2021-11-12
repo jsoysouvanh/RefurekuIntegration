@@ -23,6 +23,10 @@ ignoredFiles = []
 # Generated files will be located here
 outputDirectory = '''./Include/Generated'''
 
+generatedHeaderFileNamePattern = "##FILENAME##.rfkh.h"
+generatedSourceFileNamePattern = "##FILENAME##.rfks.h"
+classFooterMacroPattern = "##CLASSFULLNAME##_GENERATED"
+headerFileFooterMacroPattern = "File_##FILENAME##_GENERATED"
 
 [ParsingSettings]
 # Include directories of the project

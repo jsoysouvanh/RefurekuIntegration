@@ -2,7 +2,7 @@
 *	Copyright (c) 2020-2021 Julien SOYSOUVANH - All Rights Reserved
 *
 *	This file is part of the Refureku library project which is released under the MIT License.
-*	See the README.md file for full license details.
+*	See the LICENSE.md file for full license details.
 */
 
 #pragma once
@@ -35,7 +35,6 @@
 //Attributes
 #define RFK_NODISCARD	[[nodiscard]]
 #define RFK_NORETURN	[[noreturn]]
-#define RFK_FALLTHROUGH	[[fallthrough]]
 
 //Dynamic library import/export
 #if defined(KODGEN_PARSING)

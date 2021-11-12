@@ -2,7 +2,7 @@
 *	Copyright (c) 2021 Julien SOYSOUVANH - All Rights Reserved
 *
 *	This file is part of the Refureku library project which is released under the MIT License.
-*	See the README.md file for full license details.
+*	See the LICENSE.md file for full license details.
 */
 
 #pragma once
@@ -108,6 +108,10 @@ namespace rfk
 			template <typename ReturnType, typename... ArgTypes>
 			ReturnType	internalInvoke(ArgTypes&&... args)	const;
 	};
+
+	/** Base implementation of getFunction, specialized for each reflected function. */
+	template <auto FuncPtr>
+	Function const* getFunction() noexcept;
 
 	REFUREKU_TEMPLATE_API(rfk::Allocator<Function const*>);
 	REFUREKU_TEMPLATE_API(rfk::Vector<Function const*, rfk::Allocator<Function const*>>);
